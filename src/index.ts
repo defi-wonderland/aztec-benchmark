@@ -9,9 +9,14 @@ const getPublicOverhead = (data: CircuitData[]): number => {
 };
 
 const createComparisonTable = (mainData: GateCounts, prData: GateCounts, threshold: number): void => {
+
+  core.info(`start comparison`)
+
   const mainOverhead = getPublicOverhead(mainData.results);
   const prOverhead = getPublicOverhead(prData.results);
   const comparison: Record<string, ComparisonResult> = {};
+
+  core.info(`main overhead: ${mainOverhead}`)
 
   // Get all unique function names from both main and PR
   const allFunctions = new Set([...mainData.results.map((r) => r.name), ...prData.results.map((r) => r.name)]);
@@ -87,7 +92,9 @@ const createComparisonTable = (mainData: GateCounts, prData: GateCounts, thresho
 
   output.push('</table>');
 
-  writeFileSync(resolve(outputFile), output.join('\n'));
+  core.info(`Table generated: ${output.join('\n')}`)
+  core.setOutput("markdown", output.join('\n'));
+// writeFileSync(resolve(outputFile), output.join('\n'));
 };
 
 const formatDiff = (main: number, pr: number): string => {
