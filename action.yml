@@ -1,0 +1,29 @@
+name: Aztec Benchmark Diff
+author: xorsal
+description: Compare benchmark results between
+
+inputs:
+  token:
+    description: The repository's github token.
+    default: ${{ github.token }}
+    required: false
+  base:
+    description: The benchmark reference branch name.
+    default: ${{ github.base_ref || github.ref_name }}
+    required: false
+  head:
+    description: The benchmark target branch name.
+    default: ${{ github.head_ref || github.ref_name }}
+    required: false
+
+outputs:
+  markdown:
+    description: The benchmark diff between the base benchmark report and the new benchmark report, specifically formatted for markdown display
+  
+runs:
+  using: 'node20'
+  main : dist/index.js
+  
+branding:
+  icon: 'code'
+  color: 'blue'
