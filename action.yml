@@ -18,7 +18,7 @@ inputs:
 
 outputs:
   markdown:
-    description: The benchmark diff between the base benchmark report and the new benchmark report, specifically formatted for markdown display
+    description: The benchmark comparision table
   
 runs:
   using: 'node20'
