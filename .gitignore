@@ -1,3 +1,30 @@
+# Dependencies
 node_modules
-yarn.lock
+
+# Build output
+dist
+*.js
+*.js.map
+*.d.ts
+
+# Benchmark results / reports generated in action workspace
+*.benchmark*.json
+bench_diff.md
+*.benchmark_latest.json
+*.benchmark.json
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Build artifacts
+coverage
+*.tgz
+
+# Misc
+.DS_Store
+.env
+licenses.txt
 

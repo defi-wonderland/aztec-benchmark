@@ -1,29 +1,28 @@
-name: Aztec Benchmark Diff
-author: xorsal
-description: Compare benchmark results between
+name: 'Aztec Benchmark Diff'
+description: 'Runs Aztec contract benchmarks, saves results, and compares them against a baseline, generating a markdown report.'
 
 inputs:
-  token:
-    description: The repository's github token.
+  github_token:
+    description: 'GitHub token needed to potentially interact with the repo (e.g., fetch base files, comment on PRs - future use)'
+    required: false
     default: ${{ github.token }}
+  threshold:
+    description: 'Threshold for significant change (decimal, e.g. 0.024 for 2.4%). Changes above this are marked red, below are green.'
     required: false
-  base:
-    description: The benchmark reference branch name.
-    default: ${{ github.base_ref || github.ref_name }}
+    default: '0.024' # Default to 2.4%
+  report_filename:
+    description: 'Filename for the output markdown report.'
     required: false
-  head:
-    description: The benchmark target branch name.
-    default: ${{ github.head_ref || github.ref_name }}
-    required: false
+    default: 'bench_diff.md'
 
 outputs:
-  markdown:
-    description: The benchmark comparision table
-  
+  report_path:
+    description: 'The path to the generated markdown comparison report.'
+
 runs:
   using: 'node20'
-  main : dist/index.js
-  
+  main: 'dist/index.js'
+
 branding:
-  icon: 'code'
-  color: 'blue'
+  icon: 'bar-chart-2'
+  color: 'blue' 
