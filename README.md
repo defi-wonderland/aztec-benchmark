@@ -54,6 +54,7 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           # Update existing comment if found, otherwise create a new one
           edit-mode: upsert
+```
 
 ## Configuration
 
