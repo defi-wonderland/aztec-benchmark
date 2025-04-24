@@ -57,7 +57,21 @@ jobs:
 
 ## Configuration
 
--   **`Nargo.toml`:** Basic configuration like the `regression_threshold_percentage` and `report_path` can be set in the `[benchmark]` section of your `Nargo.toml` file at the repository root.
+-   **`Nargo.toml`:** Basic configuration like the `regression_threshold_percentage` and `report_path` can be set in the `[benchmark]` section of your `Nargo.toml` file at the repository root. If these values are not present, defaults will be used (threshold: 10%, report path: `benchmark_diff.md`).
+
+    ```toml
+    # Nargo.toml (at the root of the consuming repository)
+
+    [benchmark]
+    # Optional: Define the percentage change considered a regression.
+    # Default is 10 (meaning 10%)
+    regression_threshold_percentage = 5
+
+    # Optional: Specify the output filename for the markdown report.
+    # Default is "benchmark_diff.md"
+    report_path = "benchmarks/performance_report.md"
+    ```
+
 -   **Benchmark Scripts (`benchmarks/*.benchmark.ts`):** Each script defines how to benchmark a specific contract. It should export a `benchmarkConfig` object containing:
     -   An optional async `setup` function to prepare the environment (e.g., deploy contracts, get wallet).
     -   A required `getMethods` function that returns an array of `ContractFunctionInteraction` objects to be profiled.
