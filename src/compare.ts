@@ -1,29 +1,16 @@
 import * as core from '@actions/core';
-import * as TOML from 'toml';
 import fs from 'node:fs';
 import path from 'node:path';
+import { sync as globSync } from 'glob';
 
+import { type Config, type ProfileReport, type ComparisonResult } from './types.js';
 import {
-  type ProfileReport,
   getDaGas,
   getL2Gas
-} from './common.js'; // Use .js extension
+} from './utils.js';
 
-// --- Types ---
 
-interface MetricComparison {
-  main: number;
-  pr: number;
-}
-
-interface ComparisonResult {
-  gates: MetricComparison;
-  daGas: MetricComparison;
-  l2Gas: MetricComparison;
-}
-
-// --- Helper Functions ---
-
+/** Formats the difference between two numbers for the report table */
 const formatDiff = (main: number, pr: number): string => {
   if (main === 0 && pr === 0) return '-';
   if (main === 0) return '+100% 🚀'; // Indicate new non-zero value
@@ -41,12 +28,13 @@ const formatDiff = (main: number, pr: number): string => {
   return `${sign}${diffFormatted} (${sign}${pct.toFixed(0)}%)`;
 };
 
-const getStatusEmoji = (metrics: ComparisonResult, threshold: number): string => {
+/** Determines the status emoji based on comparison and threshold */
+const getStatusEmoji = (metrics: ComparisonResult, thresholdDecimal: number): string => {
   // Check if the benchmark was added or removed entirely
   const isNew = metrics.gates.main === 0 && metrics.daGas.main === 0 && metrics.l2Gas.main === 0 &&
-              (metrics.gates.pr > 0 || metrics.daGas.pr > 0 || metrics.l2Gas.pr > 0);
+    (metrics.gates.pr > 0 || metrics.daGas.pr > 0 || metrics.l2Gas.pr > 0);
   const isRemoved = metrics.gates.pr === 0 && metrics.daGas.pr === 0 && metrics.l2Gas.pr === 0 &&
-                  (metrics.gates.main > 0 || metrics.daGas.main > 0 || metrics.l2Gas.main > 0);
+    (metrics.gates.main > 0 || metrics.daGas.main > 0 || metrics.l2Gas.main > 0);
 
   if (isNew) return '🆕';
   if (isRemoved) return '🚮';
@@ -65,9 +53,9 @@ const getStatusEmoji = (metrics: ComparisonResult, threshold: number): string =>
 
   const metricsDiffs = [gateDiffPct, daGasDiffPct, l2GasDiffPct].filter(m => isFinite(m));
   const hasInfiniteIncrease = [gateDiffPct, daGasDiffPct, l2GasDiffPct].some(m => m === Infinity);
-  const thresholdDecimal = threshold; // Threshold is already a decimal (e.g., 0.024)
 
   // Determine status based on thresholds
+  // Note: thresholdDecimal is already in decimal form (e.g., 0.05 for 5%)
   const hasRegression = hasInfiniteIncrease || metricsDiffs.some(m => m > thresholdDecimal);
   const hasImprovement = metricsDiffs.some(m => m < -thresholdDecimal);
 
@@ -76,8 +64,8 @@ const getStatusEmoji = (metrics: ComparisonResult, threshold: number): string =>
   return '⚪'; // No significant change (within threshold, or zero/no change)
 };
 
-// Generates the Markdown table string for a single contract comparison
-const generateContractComparisonTable = (mainData: ProfileReport, prData: ProfileReport, threshold: number): string => {
+/** Generates the Markdown table comparing baseline and PR results for one contract */
+const generateContractComparisonTable = (mainData: ProfileReport, prData: ProfileReport, thresholdDecimal: number): string => {
   const comparison: Record<string, ComparisonResult> = {};
   const allFunctionNames = new Set<string>();
 
@@ -145,11 +133,11 @@ const generateContractComparisonTable = (mainData: ProfileReport, prData: Profil
     const metrics = comparison[funcName];
     // Metrics should always exist here due to the processing logic, but guard anyway
     if (!metrics) {
-        core.warning(`Metrics for function ${funcName} unexpectedly missing during table generation.`);
-        continue;
+      core.warning(`Metrics for function ${funcName} unexpectedly missing during table generation.`);
+      continue;
     }
 
-    const statusEmoji = getStatusEmoji(metrics, threshold);
+    const statusEmoji = getStatusEmoji(metrics, thresholdDecimal);
     output.push(
       '<tr>',
       `  <td align="center">${statusEmoji}</td>`,
@@ -175,95 +163,96 @@ const generateContractComparisonTable = (mainData: ProfileReport, prData: Profil
   return output.join('\n');
 };
 
-// --- Contract Discovery (Identical logic needed, but only checks for JSON) ---
+/** Discovers pairs of baseline (*.benchmark.json) and latest (*.benchmark_latest.json) result files. */
+function findBenchmarkJsonPairs(projectRoot: string): { name: string; path: string; baselinePath: string; latestPath: string }[] {
+  const benchmarksDir = path.join(projectRoot, 'benchmarks');
+  core.info(`Looking for benchmark JSON pairs in: ${benchmarksDir}`);
 
-// Changed to accept projectRoot (GITHUB_WORKSPACE)
-async function findBenchmarkableContractsForComparison(projectRoot: string): Promise<{ name: string; path: string }[]> {
-    const rootNargoTomlPath = path.join(projectRoot, 'Nargo.toml');
-    core.info(`Looking for Nargo.toml for comparison discovery at: ${rootNargoTomlPath}`);
-    const benchmarkableContracts: { name: string; path: string }[] = [];
+  if (!fs.existsSync(benchmarksDir) || !fs.lstatSync(benchmarksDir).isDirectory()) {
+    core.warning(`Benchmarks directory not found at ${benchmarksDir}. Cannot perform comparison.`);
+    return [];
+  }
 
-    try {
-        const tomlContent = fs.readFileSync(rootNargoTomlPath, 'utf-8');
-        const parsedToml = TOML.parse(tomlContent);
+  const foundPairs: { name: string; path: string; baselinePath: string; latestPath: string }[] = [];
 
-        if (parsedToml.workspace && Array.isArray(parsedToml.workspace.members)) {
-            core.info(`Found ${parsedToml.workspace.members.length} workspace members for comparison discovery.`);
-            for (const memberPath of parsedToml.workspace.members) {
-                const contractPath = path.join(projectRoot, memberPath);
-                const contractName = path.basename(contractPath);
+  try {
+    // Use glob.sync
+    const latestJsonFiles: string[] = globSync('*.benchmark_latest.json', {
+      cwd: benchmarksDir,
+      absolute: true,
+      nodir: true,
+    });
 
-                if (fs.existsSync(contractPath) && fs.lstatSync(contractPath).isDirectory()) {
-                    const baseJsonPath = path.join(contractPath, `${contractName}.benchmark.json`);
-                    const latestJsonPath = path.join(contractPath, `${contractName}.benchmark_latest.json`);
+    core.info(`Found ${latestJsonFiles.length} latest benchmark result file(s). Checking for baselines...`);
 
-                    core.debug(`Checking for benchmark JSON files in ${contractPath}`);
-                    // Require *both* files to exist for comparison
-                    if (fs.existsSync(baseJsonPath) && fs.existsSync(latestJsonPath)) {
-                        benchmarkableContracts.push({ name: contractName, path: contractPath });
-                        core.info(` -> Found benchmark result pair for: ${contractName} at ${memberPath}`);
-                    } else {
-                        core.debug(`Skipping ${contractName}: Missing base (${fs.existsSync(baseJsonPath)}) or latest (${fs.existsSync(latestJsonPath)}) JSON file.`);
-                    }
-                } else {
-                    core.warning(`Workspace member path ${memberPath} not found or not a directory. Skipping comparison discovery.`);
-                }
-            }
-        } else {
-            core.warning(`Root Nargo.toml (${rootNargoTomlPath}) does not contain a [workspace].members array or it's not an array.`);
-        }
-    } catch (error: any) {
-        if (error.code === 'ENOENT') {
-            core.error(`Error: Root Nargo.toml not found at ${rootNargoTomlPath}. Cannot discover contracts for comparison.`);
-            throw new Error(`Root Nargo.toml not found at ${rootNargoTomlPath}`);
-        } else {
-            core.error(`Error reading or parsing root Nargo.toml at ${rootNargoTomlPath}: ${error.message}`);
-            throw new Error(`Failed to read/parse Nargo.toml: ${error.message}`);
-        }
+    for (const latestPath of latestJsonFiles) {
+      const baseName = path.basename(latestPath, '.benchmark_latest.json');
+      const baselinePath = path.join(benchmarksDir, `${baseName}.benchmark.json`);
+
+      if (fs.existsSync(baselinePath)) {
+        core.info(` -> Found pair for ${baseName}: ${path.basename(baselinePath)} and ${path.basename(latestPath)}`);
+        foundPairs.push({
+          name: baseName,
+          path: benchmarksDir, // Consistent with src/run.ts, path refers to benchmarks dir
+          baselinePath,
+          latestPath,
+        });
+      } else {
+        core.warning(`Skipping ${baseName}: Baseline file missing (${path.basename(baselinePath)})`);
+      }
     }
+  } catch (error: any) {
+    core.error(`Error finding benchmark JSON files in ${benchmarksDir}: ${error.message}`);
+    throw new Error(`Failed to search for benchmark JSON files: ${error.message}`);
+  }
 
-    core.info(`Found ${benchmarkableContracts.length} contracts with benchmark result pairs for comparison.`);
-    return benchmarkableContracts;
+  core.info(`Found ${foundPairs.length} contracts with benchmark result pairs for comparison.`);
+  return foundPairs;
 }
 
-// --- Main Comparison Orchestration --- 
+/** 
+ * Main comparison orchestration function.
+ * Finds benchmark result pairs, compares them, generates a Markdown report,
+ * and writes it to the configured path.
+ * @param config The loaded configuration object.
+ */
+async function runComparison(config: Config): Promise<void> { // Still returns void
+  const { repo_root: projectRoot, report_path: outputFilePath, regression_threshold_percentage } = config;
 
-// Changed to accept projectRoot, outputFilePath, threshold
-async function runComparison(projectRoot: string, outputFilePath: string, threshold: number): Promise<void> {
+  // Convert percentage threshold to decimal for getStatusEmoji
+  const thresholdDecimal = (regression_threshold_percentage ?? 0) / 100;
 
   core.info("Starting benchmark comparison...");
-  core.info(`Threshold for significant change: ${threshold * 100}%`);
   core.info(`Output report file: ${outputFilePath}`);
 
-  const contractsToCompare = await findBenchmarkableContractsForComparison(projectRoot);
+  // Call the synchronous function
+  const benchmarkPairs = findBenchmarkJsonPairs(projectRoot);
 
-  if (!contractsToCompare.length) {
+  if (!benchmarkPairs.length) {
     core.warning("No contracts found with both base and latest benchmark JSON files for comparison.");
     const reportContent = '# Benchmark Comparison\n\n_No benchmark results found to compare._\n';
-    fs.writeFileSync(outputFilePath, reportContent);
+    fs.writeFileSync(outputFilePath!, reportContent);
     core.info("Written empty comparison report.");
-    return;
+    return; // Nothing to compare
   }
 
   let markdownOutput = [
-      '<!-- benchmark-diff -->',
-      '# Benchmark Comparison',
-      `_Comparison Threshold: ${threshold * 100}%_\n`,
-      'Legends: 🟢 Improvement | 🔴 Regression | ⚪ No significant change | 🆕 New | 🚮 Removed\n'
-    ];
+    '<!-- benchmark-diff -->',
+    '# Benchmark Comparison',
+    regression_threshold_percentage !== undefined ? `_Comparison Threshold: ${regression_threshold_percentage}%_\n` : '_No regression threshold set._\n',
+    // Restore legend with regression/improvement emojis
+    'Legends: 🟢 Improvement | 🔴 Regression | ⚪ No significant change | 🆕 New | 🚮 Removed\n'
+  ];
   let contractsComparedCount = 0;
 
-  for (const contractInfo of contractsToCompare) {
-    const contractName = contractInfo.name;
-    const contractPath = contractInfo.path; // Absolute path
-    const baseJsonPath = path.join(contractPath, `${contractName}.benchmark.json`);
-    const latestJsonPath = path.join(contractPath, `${contractName}.benchmark_latest.json`);
+  for (const pairInfo of benchmarkPairs) {
+    const { name: contractName, baselinePath: baseJsonPath, latestPath: latestJsonPath } = pairInfo;
 
     core.startGroup(`Comparing Contract: ${contractName}`);
     core.info(`Base file: ${baseJsonPath}`);
     core.info(`PR file: ${latestJsonPath}`);
 
-    // Files are already confirmed to exist by findBenchmarkableContractsForComparison
+    // Files are confirmed to exist by findBenchmarkJsonPairs
     try {
       const mainDataJson = fs.readFileSync(baseJsonPath, 'utf-8');
       const prDataJson = fs.readFileSync(latestJsonPath, 'utf-8');
@@ -281,7 +270,8 @@ async function runComparison(projectRoot: string, outputFilePath: string, thresh
 
       core.info(`Comparing ${mainData.results.length} base functions with ${prData.results.length} PR functions for ${contractName}.`);
 
-      const tableMarkdown = generateContractComparisonTable(mainData, prData, threshold);
+      // Pass the decimal threshold to the table generator
+      const tableMarkdown = generateContractComparisonTable(mainData, prData, thresholdDecimal);
 
       markdownOutput.push(`## Contract: ${contractName}`);
       markdownOutput.push(tableMarkdown);
@@ -290,33 +280,32 @@ async function runComparison(projectRoot: string, outputFilePath: string, thresh
 
     } catch (error: any) {
       core.error(`Error processing benchmark files for ${contractName}: ${error.message}`);
-       if (error.stack) {
-          core.debug(error.stack);
+      if (error.stack) {
+        core.debug(error.stack);
       }
       markdownOutput.push(`## Contract: ${contractName}\n`);
       markdownOutput.push(`\n⚠️ Error comparing benchmarks for this contract: ${error.message}\n`);
-       markdownOutput.push('\n---\n');
+      markdownOutput.push('\n---\n');
     }
     core.endGroup(); // End group for this contract
   }
 
-  if (contractsComparedCount === 0 && contractsToCompare.length > 0) {
-      // This case means we found pairs but failed to process all of them
-       core.warning("Found contract pairs but failed to process or validate any for comparison.");
-      markdownOutput.push('\n_Found contract pairs but failed to process or validate any for comparison._\n');
+  if (contractsComparedCount === 0 && benchmarkPairs.length > 0) {
+    // This case means we found pairs but failed to process all of them
+    core.warning("Found contract pairs but failed to process or validate any for comparison.");
+    markdownOutput.push('\n_Found contract pairs but failed to process or validate any for comparison._\n');
   }
 
   // Write the final combined report
   core.info(`Writing comparison report for ${contractsComparedCount} contract(s) to ${outputFilePath}`);
   try {
-      fs.writeFileSync(outputFilePath, markdownOutput.join('\n'));
-      core.info("Comparison report successfully written.");
+    fs.writeFileSync(outputFilePath!, markdownOutput.join('\n'));
+    core.info("Comparison report successfully written.");
   } catch (writeError: any) {
-      core.error(`Failed to write comparison report to ${outputFilePath}: ${writeError.message}`);
-      // This is a critical failure, maybe rethrow or set action failure state directly?
-      throw new Error(`Failed to write comparison report: ${writeError.message}`);
+    core.error(`Failed to write comparison report to ${outputFilePath}: ${writeError.message}`);
+    // This is a critical failure, maybe rethrow or set action failure state directly?
+    throw new Error(`Failed to write comparison report: ${writeError.message}`);
   }
 }
 
-// Export the main comparison function
 export { runComparison }; 

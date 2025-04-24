@@ -1,23 +1,9 @@
 name: 'Aztec Benchmark Diff'
 description: 'Runs Aztec contract benchmarks, saves results, and compares them against a baseline, generating a markdown report.'
 
-inputs:
-  github_token:
-    description: 'GitHub token needed to potentially interact with the repo (e.g., fetch base files, comment on PRs - future use)'
-    required: false
-    default: ${{ github.token }}
-  threshold:
-    description: 'Threshold for significant change (decimal, e.g. 0.024 for 2.4%). Changes above this are marked red, below are green.'
-    required: false
-    default: '0.024' # Default to 2.4%
-  report_filename:
-    description: 'Filename for the output markdown report.'
-    required: false
-    default: 'bench_diff.md'
-
 outputs:
   report_path:
-    description: 'The path to the generated markdown comparison report.'
+    description: 'The path to the generated markdown comparison report (determined by Nargo.toml or default).'
 
 runs:
   using: 'node20'

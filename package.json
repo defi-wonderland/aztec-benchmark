@@ -4,7 +4,7 @@
   "description": "GitHub Action to run and compare Aztec benchmark results",
   "main": "dist/index.js",
   "scripts": {
-    "build": "ncc build src/main.ts -o dist --source-map --license licenses.txt",
+    "build": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
     "lint": "eslint . --ext .ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "format": "prettier --write \"src/**/*.ts\""
@@ -24,6 +24,7 @@
     "@aztec/aztec.js": "^0.85.0",
     "@aztec/circuit-types": "^0.76.4",
     "@aztec/stdlib": "^0.85.0",
+    "@types/glob": "^8.1.0",
     "toml": "^3.0.0"
   },
   "devDependencies": {
