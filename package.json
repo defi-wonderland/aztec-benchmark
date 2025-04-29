@@ -15,8 +15,8 @@
   "files": [
     "dist",
     "action/action.yml",
-    "action/index.js",
-    "action/comparison.js",
+    "action/index.cjs",
+    "action/comparison.cjs",
     "bin"
   ],
   "license": "MIT",

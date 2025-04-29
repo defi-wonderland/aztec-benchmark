@@ -5,7 +5,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import toml from '@iarna/toml'; // Use @iarna/toml
 import { Profiler } from './profiler.js';
-import { BenchmarkBase } from './types.js'; // Import base class and ProfileResult
 const program = new Command();
 program
     .name('benchmark-cli')
@@ -82,8 +81,9 @@ program
             // Switch back to dynamic import(), tsx should handle it
             const module = await import(benchmarkFilePath);
             const BenchmarkClass = module.default;
-            if (!BenchmarkClass || !(typeof BenchmarkClass === 'function') || !(BenchmarkClass.prototype instanceof BenchmarkBase)) {
-                console.error(`Error: ${benchmarkFilePath} does not export a default class extending Benchmark.`);
+            // Duck-typing check: Is it a class/function with a getMethods prototype method?
+            if (!BenchmarkClass || !(typeof BenchmarkClass === 'function') || !(typeof BenchmarkClass.prototype.getMethods === 'function')) {
+                console.error(`Error: ${benchmarkFilePath} does not export a default class with a getMethods method.`);
                 continue;
             }
             const benchmarkInstance = new BenchmarkClass();

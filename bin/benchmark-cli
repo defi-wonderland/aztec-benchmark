@@ -10,5 +10,5 @@ while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symli
 done
 SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 
-# Execute the actual CLI source code using tsx relative to the real script path
-exec tsx "$SCRIPT_DIR/../cli/cli.ts" "$@" 
+# Execute the actual CLI source code using npx tsx relative to the real script path
+exec npx tsx "$SCRIPT_DIR/../cli/cli.ts" "$@" 

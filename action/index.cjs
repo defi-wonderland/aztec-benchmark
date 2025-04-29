@@ -3,7 +3,7 @@ const core = require('@actions/core');
 const exec = require('@actions/exec'); // Import exec
 const fs = require('node:fs');
 const path = require('node:path');
-const { runComparison } = require('./comparison.js');
+const { runComparison } = require('./comparison.cjs');
 
 async function run() {
   try {
@@ -38,14 +38,17 @@ async function run() {
     cliArgs.push('--suffix', latestSuffix); // Generate with _latest suffix
 
     // Determine path to the compiled CLI script relative to this action script
-    // action/index.js -> ../dist/cli/cli.js
-    const cliScriptPath = path.resolve(__dirname, '../dist/cli/cli.js');
-    core.info(`Executing: tsx ${cliScriptPath} ${cliArgs.join(' ')}`);
+    // action/index.js -> ../dist/cli/cli.js <-- This logic is no longer needed
+    // const cliScriptPath = path.resolve(__dirname, '../dist/cli/cli.js'); 
+    // core.info(`Executing: tsx ${cliScriptPath} ${cliArgs.join(' ')}`); <-- No longer using tsx directly
+
+    core.info(`Executing: benchmark-cli ${cliArgs.join(' ')}`); // Log the command
 
     const execOptions = {
         cwd: process.cwd() // Ensure CLI runs in the context of the consuming repo root
     };
-    const exitCode = await exec.exec('tsx', [cliScriptPath, ...cliArgs], execOptions);
+    // const exitCode = await exec.exec('tsx', [cliScriptPath, ...cliArgs], execOptions); <-- Change command
+    const exitCode = await exec.exec('benchmark-cli', cliArgs, execOptions);
     if (exitCode !== 0) {
         throw new Error(`Benchmark CLI execution failed with exit code ${exitCode}`);
     }

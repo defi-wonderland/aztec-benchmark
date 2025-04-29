@@ -106,8 +106,9 @@ program
         const module = await import(benchmarkFilePath);
         const BenchmarkClass = module.default;
 
-        if (!BenchmarkClass || !(typeof BenchmarkClass === 'function') || !(BenchmarkClass.prototype instanceof BenchmarkBase)) {
-            console.error(`Error: ${benchmarkFilePath} does not export a default class extending Benchmark.`);
+        // Duck-typing check: Is it a class/function with a getMethods prototype method?
+        if (!BenchmarkClass || !(typeof BenchmarkClass === 'function') || !(typeof BenchmarkClass.prototype.getMethods === 'function')) {
+            console.error(`Error: ${benchmarkFilePath} does not export a default class with a getMethods method.`);
             continue;
         }
 
