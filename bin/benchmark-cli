@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# More robust symlink resolution
+SOURCE="$0"
+while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+
+# Execute the actual CLI source code using tsx relative to the real script path
+exec tsx "$SCRIPT_DIR/../cli/cli.ts" "$@" 

@@ -8,7 +8,7 @@ import {
   type ProfileReport,
   type Gas,
   type GasLimits,
-} from './types';
+} from './types.js';
 
 // --- Helper Functions ---
 

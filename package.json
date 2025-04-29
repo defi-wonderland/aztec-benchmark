@@ -2,10 +2,11 @@
   "name": "benchmark-cli",
   "version": "1.0.0",
   "description": "CLI tool and GitHub Action for Aztec contract benchmarking",
-  "main": "dist/cli/index.js",
-  "types": "dist/cli/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
   "bin": {
-    "benchmark-cli": "./dist/cli/cli.js"
+    "benchmark-cli": "./bin/benchmark-cli"
   },
   "scripts": {
     "build": "tsc",
@@ -15,7 +16,8 @@
     "dist",
     "action/action.yml",
     "action/index.js",
-    "action/comparison.js"
+    "action/comparison.js",
+    "bin"
   ],
   "license": "MIT",
   "dependencies": {

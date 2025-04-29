@@ -1,16 +1,10 @@
-"use strict";
 var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (receiver, state, kind, f) {
     if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 var _Profiler_instances, _Profiler_profileOne;
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Profiler = void 0;
-const node_fs_1 = __importDefault(require("node:fs"));
+import fs from 'node:fs';
 // --- Helper Functions ---
 function sumArray(arr) {
     return arr.reduce((a, b) => a + b, 0);
@@ -19,7 +13,7 @@ function sumGas(gas) {
     return (gas?.daGas ?? 0) + (gas?.l2Gas ?? 0);
 }
 // --- Profiler Class (Adapted from scripts/benchmark.ts) ---
-class Profiler {
+export class Profiler {
     constructor() {
         _Profiler_instances.add(this);
     }
@@ -35,7 +29,7 @@ class Profiler {
         if (!results.length) {
             console.log(`No results to save for ${filename}. Saving empty report.`);
             // Write empty results structure
-            node_fs_1.default.writeFileSync(filename, JSON.stringify({ summary: {}, results: [], gasSummary: {} }, null, 2));
+            fs.writeFileSync(filename, JSON.stringify({ summary: {}, results: [], gasSummary: {} }, null, 2));
             return;
         }
         const summary = results.reduce((acc, result) => ({
@@ -55,7 +49,7 @@ class Profiler {
         };
         console.log(`Saving results for ${results.length} methods in ${filename}`);
         try {
-            node_fs_1.default.writeFileSync(filename, JSON.stringify(report, null, 2));
+            fs.writeFileSync(filename, JSON.stringify(report, null, 2));
         }
         catch (error) {
             console.error(`Error writing results to ${filename}:`, error.message);
@@ -63,7 +57,6 @@ class Profiler {
         }
     }
 }
-exports.Profiler = Profiler;
 _Profiler_instances = new WeakSet(), _Profiler_profileOne = async function _Profiler_profileOne(f) {
     let name = 'unknown_function';
     try {

@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env node
 // benchmark-cli/src/cli.ts
 import { Command } from 'commander';
 import fs from 'node:fs';
@@ -98,7 +98,6 @@ program
 
       if (!fs.existsSync(benchmarkFilePath)) {
         console.error(`Error: Benchmark file not found: ${benchmarkFilePath}`);
-        await profiler.saveResults([], outputJsonPath); // Save empty/error report
         continue; // Skip to next contract
       }
 
@@ -109,7 +108,6 @@ program
 
         if (!BenchmarkClass || !(typeof BenchmarkClass === 'function') || !(BenchmarkClass.prototype instanceof BenchmarkBase)) {
             console.error(`Error: ${benchmarkFilePath} does not export a default class extending Benchmark.`);
-            await profiler.saveResults([], outputJsonPath);
             continue;
         }
 
@@ -128,7 +126,6 @@ program
 
         if (!Array.isArray(methodsToBenchmark) || methodsToBenchmark.length === 0) {
           console.warn(`No benchmark methods returned by getMethods for ${contractName}. Saving empty report.`);
-          await profiler.saveResults([], outputJsonPath);
         } else {
           console.log(`Profiling ${methodsToBenchmark.length} methods for ${contractName}...`);
           const results = await profiler.profile(methodsToBenchmark);
@@ -144,19 +141,6 @@ program
         console.log(`--- Benchmark finished for ${contractName} ---`);
       } catch (error: any) {
         console.error(`Failed to run benchmark for ${contractName} from ${benchmarkFilePath}:`, error);
-        // Attempt to save an error report
-        try {
-            const errorResult: ProfileResult = {
-                name: 'BENCHMARK_RUNNER_ERROR',
-                totalGateCount: 0,
-                gateCounts: [],
-                gas: { gasLimits: { daGas: 0, l2Gas: 0 }, teardownGasLimits: { daGas: 0, l2Gas: 0 } }, // Keep local nested structure
-            };
-            await profiler.saveResults([errorResult], outputJsonPath);
-            console.error(`Saved error report to ${outputJsonPath}`);
-        } catch (writeError: any) {
-            console.error(`Failed to write error report to ${outputJsonPath}:`, writeError.message);
-        }
       }
     }
 
