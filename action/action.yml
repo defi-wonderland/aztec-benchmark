@@ -18,4 +18,4 @@ outputs:
     description: "The path to the generated markdown file."
 runs:
   using: 'node20'
-  main: 'action/index.cjs' # Entry point is within the action directory 
+  main: 'dist/index.cjs' # Entry point is within the action directory, in the dist subfolder 
