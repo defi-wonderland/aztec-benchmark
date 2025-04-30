@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/usr/bin/env sh
 
-# More robust symlink resolution
+# Resolve symlinks to find the actual script directory
 SOURCE="$0"
 while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
   DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
@@ -10,5 +10,16 @@ while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symli
 done
 SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 
-# Execute the actual CLI source code using npx tsx relative to the real script path
-exec npx tsx "$SCRIPT_DIR/../cli/cli.ts" "$@" 
+# Construct the path to the actual CLI entry point in dist relative to the *real* script directory.
+CLI_SCRIPT="$SCRIPT_DIR/../dist/cli.js"
+
+# Check if the CLI script exists.
+if [ ! -f "$CLI_SCRIPT" ]; then
+  echo "Error: CLI entry point not found at $CLI_SCRIPT" >&2
+  echo "Please ensure the package is built correctly." >&2
+  exit 1
+fi
+
+# Execute the actual CLI script using tsx, passing all arguments.
+# Use exec to replace the current shell process with tsx.
+exec tsx "$CLI_SCRIPT" "$@"

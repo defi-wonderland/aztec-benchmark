@@ -33,8 +33,6 @@ async function run() {
     // --- Step 1: Generate Latest Benchmark Reports --- 
     core.startGroup('Generating latest benchmark reports (all contracts)');
     const cliArgs = [];
-    cliArgs.push('--config', configPath); // Use hardcoded config path
-    cliArgs.push('--output-dir', reportsDir);
     cliArgs.push('--suffix', latestSuffix); // Generate with _latest suffix
 
     // Determine path to the compiled CLI script relative to this action script
@@ -48,7 +46,7 @@ async function run() {
         cwd: process.cwd() // Ensure CLI runs in the context of the consuming repo root
     };
     // const exitCode = await exec.exec('tsx', [cliScriptPath, ...cliArgs], execOptions); <-- Change command
-    const exitCode = await exec.exec('benchmark-cli', cliArgs, execOptions);
+    const exitCode = await exec.exec('yarn bench', cliArgs, execOptions);
     if (exitCode !== 0) {
         throw new Error(`Benchmark CLI execution failed with exit code ${exitCode}`);
     }
