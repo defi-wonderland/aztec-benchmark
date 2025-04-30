@@ -1,6 +1,6 @@
 {
   "name": "aztec-benchmark",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "CLI tool and GitHub Action for Aztec contract benchmarking",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
