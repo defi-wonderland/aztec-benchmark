@@ -1,41 +1,55 @@
-"use strict";
 var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (receiver, state, kind, f) {
     if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 var _Profiler_instances, _Profiler_profileOne;
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Profiler = void 0;
-const node_fs_1 = __importDefault(require("node:fs"));
-// --- Helper Functions ---
+import fs from 'node:fs';
+/**
+ * Sums all numbers in an array.
+ * @param arr - The array of numbers to sum.
+ * @returns The sum of the numbers.
+ */
 function sumArray(arr) {
     return arr.reduce((a, b) => a + b, 0);
 }
+/**
+ * Sums DA and L2 gas components.
+ * @param gas - The gas object.
+ * @returns The total gas (DA + L2).
+ */
 function sumGas(gas) {
     return (gas?.daGas ?? 0) + (gas?.l2Gas ?? 0);
 }
-// --- Profiler Class (Adapted from scripts/benchmark.ts) ---
-class Profiler {
+/**
+ * Profiles Aztec contract functions to measure gate counts and gas usage.
+ */
+export class Profiler {
     constructor() {
         _Profiler_instances.add(this);
     }
+    /**
+     * Profiles a list of contract function interactions.
+     * @param fsToProfile - An array of contract function interactions to profile.
+     * @returns A promise that resolves to an array of profile results.
+     */
     async profile(fsToProfile) {
         const results = [];
         for (const f of fsToProfile) {
-            // Assumption: f is already configured with a wallet via getMethods in the user's benchmark file
             results.push(await __classPrivateFieldGet(this, _Profiler_instances, "m", _Profiler_profileOne).call(this, f));
         }
         return results;
     }
+    /**
+     * Saves the profiling results to a JSON file.
+     * If no results are provided, an empty report is saved.
+     * @param results - An array of profile results to save.
+     * @param filename - The name of the file to save the results to.
+     */
     async saveResults(results, filename) {
         if (!results.length) {
             console.log(`No results to save for ${filename}. Saving empty report.`);
-            // Write empty results structure
-            node_fs_1.default.writeFileSync(filename, JSON.stringify({ summary: {}, results: [], gasSummary: {} }, null, 2));
+            fs.writeFileSync(filename, JSON.stringify({ summary: {}, results: [], gasSummary: {} }, null, 2));
             return;
         }
         const summary = results.reduce((acc, result) => ({
@@ -55,33 +69,35 @@ class Profiler {
         };
         console.log(`Saving results for ${results.length} methods in ${filename}`);
         try {
-            node_fs_1.default.writeFileSync(filename, JSON.stringify(report, null, 2));
+            fs.writeFileSync(filename, JSON.stringify(report, null, 2));
         }
         catch (error) {
             console.error(`Error writing results to ${filename}:`, error.message);
-            throw error; // Re-throw error after logging
+            throw error;
         }
     }
 }
-exports.Profiler = Profiler;
-_Profiler_instances = new WeakSet(), _Profiler_profileOne = async function _Profiler_profileOne(f) {
+_Profiler_instances = new WeakSet(), _Profiler_profileOne = 
+/**
+ * Profiles a single contract function interaction.
+ * @param f - The contract function interaction to profile.
+ * @returns A promise that resolves to a profile result for the function.
+ *          Returns a result with FAILED in the name and zero counts/gas if profiling errors.
+ * @private
+ */
+async function _Profiler_profileOne(f) {
     let name = 'unknown_function';
     try {
-        // Replicate original script logic: Get request payload first
         const executionPayload = await f.request();
         if (executionPayload.calls && executionPayload.calls.length > 0) {
             const firstCall = executionPayload.calls[0];
-            // Prioritize call.name, then selector, then default
             name = firstCall?.name ?? firstCall?.selector?.toString() ?? 'unknown_function';
         }
         else {
             console.warn('No calls found in execution payload.');
-            // Keep name as 'unknown_function'
         }
     }
     catch (e) {
-        // Error requesting simulation - might happen if interaction is invalid
-        // We might still be able to get the intended method name directly?
         const potentialMethodName = f.methodName;
         if (potentialMethodName) {
             name = potentialMethodName;
@@ -89,7 +105,6 @@ _Profiler_instances = new WeakSet(), _Profiler_profileOne = async function _Prof
         }
         else {
             console.warn(`Could not determine function name from request simulation: ${e.message}`);
-            // Keep name as 'unknown_function'
         }
     }
     console.log(`Profiling ${name}...`);
@@ -98,7 +113,7 @@ _Profiler_instances = new WeakSet(), _Profiler_profileOne = async function _Prof
         const profileResults = await f.profile({ profileMode: 'full' });
         await f.send().wait();
         const result = {
-            name, // Use the name determined above
+            name,
             totalGateCount: sumArray(profileResults.executionSteps
                 .map(step => step.gateCount)
                 .filter((count) => count !== undefined)),

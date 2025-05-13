@@ -8,34 +8,52 @@ import {
   type ProfileReport,
   type Gas,
   type GasLimits,
-} from './types';
+} from './types.js';
 
-// --- Helper Functions ---
-
+/**
+ * Sums all numbers in an array.
+ * @param arr - The array of numbers to sum.
+ * @returns The sum of the numbers.
+ */
 function sumArray(arr: number[]): number {
   return arr.reduce((a, b) => a + b, 0);
 }
 
+/**
+ * Sums DA and L2 gas components.
+ * @param gas - The gas object.
+ * @returns The total gas (DA + L2).
+ */
 function sumGas(gas: Gas): number {
   return (gas?.daGas ?? 0) + (gas?.l2Gas ?? 0);
 }
 
-// --- Profiler Class (Adapted from scripts/benchmark.ts) ---
-
+/**
+ * Profiles Aztec contract functions to measure gate counts and gas usage.
+ */
 export class Profiler {
+  /**
+   * Profiles a list of contract function interactions.
+   * @param fsToProfile - An array of contract function interactions to profile.
+   * @returns A promise that resolves to an array of profile results.
+   */
   async profile(fsToProfile: ContractFunctionInteraction[]): Promise<ProfileResult[]> {
     const results: ProfileResult[] = [];
     for (const f of fsToProfile) {
-      // Assumption: f is already configured with a wallet via getMethods in the user's benchmark file
       results.push(await this.#profileOne(f));
     }
     return results;
   }
 
+  /**
+   * Saves the profiling results to a JSON file.
+   * If no results are provided, an empty report is saved.
+   * @param results - An array of profile results to save.
+   * @param filename - The name of the file to save the results to.
+   */
   async saveResults(results: ProfileResult[], filename: string) {
     if (!results.length) {
       console.log(`No results to save for ${filename}. Saving empty report.`);
-      // Write empty results structure
       fs.writeFileSync(
         filename,
         JSON.stringify({ summary: {}, results: [], gasSummary: {} } as ProfileReport, null, 2),
@@ -72,33 +90,34 @@ export class Profiler {
       fs.writeFileSync(filename, JSON.stringify(report, null, 2));
     } catch (error: any) {
       console.error(`Error writing results to ${filename}:`, error.message);
-      throw error; // Re-throw error after logging
+      throw error;
     }
   }
 
+  /**
+   * Profiles a single contract function interaction.
+   * @param f - The contract function interaction to profile.
+   * @returns A promise that resolves to a profile result for the function.
+   *          Returns a result with FAILED in the name and zero counts/gas if profiling errors.
+   * @private
+   */
   async #profileOne(f: ContractFunctionInteraction): Promise<ProfileResult> {
     let name = 'unknown_function';
     try {
-      // Replicate original script logic: Get request payload first
       const executionPayload = await f.request();
       if (executionPayload.calls && executionPayload.calls.length > 0) {
         const firstCall = executionPayload.calls[0];
-        // Prioritize call.name, then selector, then default
         name = firstCall?.name ?? firstCall?.selector?.toString() ?? 'unknown_function';
       } else {
         console.warn('No calls found in execution payload.');
-        // Keep name as 'unknown_function'
       }
     } catch (e: any) {
-      // Error requesting simulation - might happen if interaction is invalid
-      // We might still be able to get the intended method name directly?
       const potentialMethodName = (f as any).methodName;
       if (potentialMethodName) {
           name = potentialMethodName;
           console.warn(`Could not simulate request (${e.message}), using interaction.methodName as fallback: ${name}`);
       } else {
           console.warn(`Could not determine function name from request simulation: ${e.message}`);
-          // Keep name as 'unknown_function'
       }
     }
 
@@ -110,7 +129,7 @@ export class Profiler {
       await f.send().wait();
 
       const result: ProfileResult = {
-        name, // Use the name determined above
+        name,
         totalGateCount: sumArray(
           profileResults.executionSteps
             .map(step => step.gateCount)
