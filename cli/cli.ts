@@ -2,13 +2,13 @@
 import { Command } from 'commander';
 import fs from 'node:fs';
 import path from 'node:path';
-import toml from '@iarna/toml'; // Use @iarna/toml
+import toml from '@iarna/toml';
 import { Profiler } from './profiler.js';
-import { BenchmarkBase, BenchmarkContext, type ProfileResult } from './types.js'; // Import base class and ProfileResult
+import { BenchmarkBase, BenchmarkContext, type ProfileResult } from './types.js';
 
-// Updated interface for the expected [benchmark] section
+// Interface for the expected [benchmark] section
 interface NargoToml {
-  benchmark?: Record<string, string>; // Expects { contract_name: path_string, ... }
+  benchmark?: Record<string, string>;
 }
 
 const program = new Command();
@@ -17,22 +17,21 @@ program
   .name('aztec-benchmark')
   .description('Runs benchmarks defined in Nargo.toml and associated *.benchmark.ts files.')
   .option('-c, --contracts <names...>', 'Specify contracts to benchmark by name (defined in Nargo.toml)')
-  .option('--config <path>', 'Path to the Nargo.toml file', './Nargo.toml') // Default path
-  .option('-o, --output-dir <path>', 'Directory to save benchmark reports', './benchmarks') // Default output
-  .option('-s, --suffix <suffix>', 'Optional suffix to append to the report filename (e.g., _pr)') // New option
+  .option('--config <path>', 'Path to the Nargo.toml file', './Nargo.toml')
+  .option('-o, --output-dir <path>', 'Directory to save benchmark reports', './benchmarks')
+  .option('-s, --suffix <suffix>', 'Optional suffix to append to the report filename (e.g., _pr)')
   .action(async (options) => {
 
     const nargoTomlPath = path.resolve(process.cwd(), options.config);
     const outputDir = path.resolve(process.cwd(), options.outputDir);
     const specifiedContractNames = options.contracts || [];
-    const suffix = options.suffix || ''; // Get suffix or default to empty string
+    const suffix = options.suffix || '';
 
     if (!fs.existsSync(nargoTomlPath)) {
       console.error(`Error: Nargo.toml not found at ${nargoTomlPath}`);
       process.exit(1);
     }
 
-    // Ensure output directory exists
     if (!fs.existsSync(outputDir)) {
       console.log(`Creating output directory: ${outputDir}`);
       fs.mkdirSync(outputDir, { recursive: true });
@@ -47,7 +46,6 @@ program
       process.exit(1);
     }
 
-    // Get benchmarks from the [benchmark] section
     const availableBenchmarks = nargoConfig.benchmark || {};
     const availableContractNames = Object.keys(availableBenchmarks);
 
@@ -59,20 +57,16 @@ program
     // Filter contracts to run based on CLI option
     const contractsToRunNames = specifiedContractNames.length > 0
       ? availableContractNames.filter(name => specifiedContractNames.includes(name))
-      : availableContractNames; // Run all if none specified
+      : availableContractNames;
 
-    // Check if any contracts are selected to run *after* processing options and config
     if (contractsToRunNames.length === 0) {
-        // If specific contracts were requested but none were valid, show error
         if (specifiedContractNames.length > 0) {
             console.error(
               `Error: None of the specified contracts found in the [benchmark] section: ${specifiedContractNames.join(', ')}`,
             );
         } else {
-            // If no contracts were specified AND none were found in Nargo.toml
             console.error('Error: No benchmarks specified via --contracts flag or found in the [benchmark] section of Nargo.toml.');
         }
-        // Output help only if no contracts are going to run
         program.outputHelp();
         process.exit(1);
     }
@@ -86,7 +80,6 @@ program
     // Iterate over the filtered contract names
     for (const contractName of contractsToRunNames) {
       const benchmarkFileName = availableBenchmarks[contractName];
-      // Resolve benchmark file path relative to the Nargo.toml directory
       const benchmarkFilePath = path.resolve(path.dirname(nargoTomlPath), benchmarkFileName);
       const outputFilename = `${contractName}${suffix}.benchmark.json`;
       const outputJsonPath = path.join(outputDir, outputFilename);
@@ -97,15 +90,13 @@ program
 
       if (!fs.existsSync(benchmarkFilePath)) {
         console.error(`Error: Benchmark file not found: ${benchmarkFilePath}`);
-        continue; // Skip to next contract
+        continue;
       }
 
       try {
-        // Switch back to dynamic import(), tsx should handle it
         const module = await import(benchmarkFilePath);
         const BenchmarkClass = module.default;
 
-        // Duck-typing check: Is it a class/function with a getMethods prototype method?
         if (!BenchmarkClass || !(typeof BenchmarkClass === 'function') || !(typeof BenchmarkClass.prototype.getMethods === 'function')) {
             console.error(`Error: ${benchmarkFilePath} does not export a default class with a getMethods method.`);
             continue;
@@ -113,7 +104,7 @@ program
 
         const benchmarkInstance: BenchmarkBase = new BenchmarkClass();
 
-        let runContext: BenchmarkContext = {}; // Initialize empty context
+        let runContext: BenchmarkContext = {};
 
         if (typeof benchmarkInstance.setup === 'function') {
           console.log(`Running setup for ${contractName}...`);

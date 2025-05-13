@@ -20,7 +20,6 @@ export class Profiler {
     async profile(fsToProfile) {
         const results = [];
         for (const f of fsToProfile) {
-            // Assumption: f is already configured with a wallet via getMethods in the user's benchmark file
             results.push(await __classPrivateFieldGet(this, _Profiler_instances, "m", _Profiler_profileOne).call(this, f));
         }
         return results;
@@ -28,7 +27,6 @@ export class Profiler {
     async saveResults(results, filename) {
         if (!results.length) {
             console.log(`No results to save for ${filename}. Saving empty report.`);
-            // Write empty results structure
             fs.writeFileSync(filename, JSON.stringify({ summary: {}, results: [], gasSummary: {} }, null, 2));
             return;
         }
@@ -53,28 +51,23 @@ export class Profiler {
         }
         catch (error) {
             console.error(`Error writing results to ${filename}:`, error.message);
-            throw error; // Re-throw error after logging
+            throw error;
         }
     }
 }
 _Profiler_instances = new WeakSet(), _Profiler_profileOne = async function _Profiler_profileOne(f) {
     let name = 'unknown_function';
     try {
-        // Replicate original script logic: Get request payload first
         const executionPayload = await f.request();
         if (executionPayload.calls && executionPayload.calls.length > 0) {
             const firstCall = executionPayload.calls[0];
-            // Prioritize call.name, then selector, then default
             name = firstCall?.name ?? firstCall?.selector?.toString() ?? 'unknown_function';
         }
         else {
             console.warn('No calls found in execution payload.');
-            // Keep name as 'unknown_function'
         }
     }
     catch (e) {
-        // Error requesting simulation - might happen if interaction is invalid
-        // We might still be able to get the intended method name directly?
         const potentialMethodName = f.methodName;
         if (potentialMethodName) {
             name = potentialMethodName;
@@ -82,7 +75,6 @@ _Profiler_instances = new WeakSet(), _Profiler_profileOne = async function _Prof
         }
         else {
             console.warn(`Could not determine function name from request simulation: ${e.message}`);
-            // Keep name as 'unknown_function'
         }
     }
     console.log(`Profiling ${name}...`);
@@ -91,7 +83,7 @@ _Profiler_instances = new WeakSet(), _Profiler_profileOne = async function _Prof
         const profileResults = await f.profile({ profileMode: 'full' });
         await f.send().wait();
         const result = {
-            name, // Use the name determined above
+            name,
             totalGateCount: sumArray(profileResults.executionSteps
                 .map(step => step.gateCount)
                 .filter((count) => count !== undefined)),

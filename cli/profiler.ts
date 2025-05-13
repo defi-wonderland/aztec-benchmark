@@ -26,7 +26,6 @@ export class Profiler {
   async profile(fsToProfile: ContractFunctionInteraction[]): Promise<ProfileResult[]> {
     const results: ProfileResult[] = [];
     for (const f of fsToProfile) {
-      // Assumption: f is already configured with a wallet via getMethods in the user's benchmark file
       results.push(await this.#profileOne(f));
     }
     return results;
@@ -35,7 +34,6 @@ export class Profiler {
   async saveResults(results: ProfileResult[], filename: string) {
     if (!results.length) {
       console.log(`No results to save for ${filename}. Saving empty report.`);
-      // Write empty results structure
       fs.writeFileSync(
         filename,
         JSON.stringify({ summary: {}, results: [], gasSummary: {} } as ProfileReport, null, 2),
@@ -72,33 +70,27 @@ export class Profiler {
       fs.writeFileSync(filename, JSON.stringify(report, null, 2));
     } catch (error: any) {
       console.error(`Error writing results to ${filename}:`, error.message);
-      throw error; // Re-throw error after logging
+      throw error;
     }
   }
 
   async #profileOne(f: ContractFunctionInteraction): Promise<ProfileResult> {
     let name = 'unknown_function';
     try {
-      // Replicate original script logic: Get request payload first
       const executionPayload = await f.request();
       if (executionPayload.calls && executionPayload.calls.length > 0) {
         const firstCall = executionPayload.calls[0];
-        // Prioritize call.name, then selector, then default
         name = firstCall?.name ?? firstCall?.selector?.toString() ?? 'unknown_function';
       } else {
         console.warn('No calls found in execution payload.');
-        // Keep name as 'unknown_function'
       }
     } catch (e: any) {
-      // Error requesting simulation - might happen if interaction is invalid
-      // We might still be able to get the intended method name directly?
       const potentialMethodName = (f as any).methodName;
       if (potentialMethodName) {
           name = potentialMethodName;
           console.warn(`Could not simulate request (${e.message}), using interaction.methodName as fallback: ${name}`);
       } else {
           console.warn(`Could not determine function name from request simulation: ${e.message}`);
-          // Keep name as 'unknown_function'
       }
     }
 
@@ -110,7 +102,7 @@ export class Profiler {
       await f.send().wait();
 
       const result: ProfileResult = {
-        name, // Use the name determined above
+        name,
         totalGateCount: sumArray(
           profileResults.executionSteps
             .map(step => step.gateCount)
