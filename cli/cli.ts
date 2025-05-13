@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// benchmark-cli/src/cli.ts
 import { Command } from 'commander';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,7 +14,7 @@ interface NargoToml {
 const program = new Command();
 
 program
-  .name('benchmark-cli')
+  .name('aztec-benchmark')
   .description('Runs benchmarks defined in Nargo.toml and associated *.benchmark.ts files.')
   .option('-c, --contracts <names...>', 'Specify contracts to benchmark by name (defined in Nargo.toml)')
   .option('--config <path>', 'Path to the Nargo.toml file', './Nargo.toml') // Default path

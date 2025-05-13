@@ -1,5 +1,3 @@
-// benchmark-cli/src/index.ts
-
 // Export the base class and types for users
 export { BenchmarkBase as Benchmark, BenchmarkContext } from './types.js'; // Alias BenchmarkBase to Benchmark for user convenience
 export type { ProfileReport, ProfileResult, GateCount } from './types.js';

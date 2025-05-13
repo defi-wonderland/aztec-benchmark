@@ -42,13 +42,13 @@ async function run() {
     // const cliScriptPath = path.resolve(__dirname, '../dist/cli/cli.js'); 
     // core.info(`Executing: tsx ${cliScriptPath} ${cliArgs.join(' ')}`); <-- No longer using tsx directly
 
-    core.info(`Executing: benchmark-cli ${cliArgs.join(' ')}`); // Log the command
+    core.info(`Executing: aztec-benchmark ${cliArgs.join(' ')}`); // Log the command
 
     const execOptions = {
         cwd: process.cwd() // Ensure CLI runs in the context of the consuming repo root
     };
     // const exitCode = await exec.exec('tsx', [cliScriptPath, ...cliArgs], execOptions); <-- Change command
-    const exitCode = await exec.exec('benchmark-cli', cliArgs, execOptions);
+    const exitCode = await exec.exec('aztec-benchmark', cliArgs, execOptions);
     if (exitCode !== 0) {
         throw new Error(`Benchmark CLI execution failed with exit code ${exitCode}`);
     }
