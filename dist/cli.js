@@ -12,6 +12,15 @@ program
     .option('--config <path>', 'Path to the Nargo.toml file', './Nargo.toml')
     .option('-o, --output-dir <path>', 'Directory to save benchmark reports', './benchmarks')
     .option('-s, --suffix <suffix>', 'Optional suffix to append to the report filename (e.g., _pr)')
+    /**
+     * Main action for the CLI.
+     * Parses Nargo.toml, finds and runs specified benchmarks, and saves the reports.
+     * @param options - The command line options.
+     * @param options.contracts - Specific contracts to benchmark.
+     * @param options.config - Path to the Nargo.toml file.
+     * @param options.outputDir - Directory to save reports.
+     * @param options.suffix - Optional suffix for report filenames.
+     */
     .action(async (options) => {
     const nargoTomlPath = path.resolve(process.cwd(), options.config);
     const outputDir = path.resolve(process.cwd(), options.outputDir);

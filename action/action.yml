@@ -1,4 +1,3 @@
-# action/action.yml
 name: 'Generate and Compare Aztec Benchmarks'
 description: 'Generates _latest benchmark reports for all contracts using `aztec-benchmark`, then compares them to _base reports and outputs markdown.'
 inputs:

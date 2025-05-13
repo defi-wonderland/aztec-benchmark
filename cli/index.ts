@@ -4,9 +4,3 @@ export type { ProfileReport, ProfileResult, GateCount } from './types.js';
 
 // Also export the Profiler for potential advanced use (or internal use by CLI)
 export { Profiler } from './profiler.js';
-
-// We will define and export the Benchmark class here later.
-console.log('Benchmark CLI package entry point.');
-
-// Placeholder export (replace with actual Benchmark class later)
-export abstract class BenchmarkBase { } 

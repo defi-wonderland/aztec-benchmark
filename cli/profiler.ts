@@ -10,19 +10,33 @@ import {
   type GasLimits,
 } from './types.js';
 
-// --- Helper Functions ---
-
+/**
+ * Sums all numbers in an array.
+ * @param arr - The array of numbers to sum.
+ * @returns The sum of the numbers.
+ */
 function sumArray(arr: number[]): number {
   return arr.reduce((a, b) => a + b, 0);
 }
 
+/**
+ * Sums DA and L2 gas components.
+ * @param gas - The gas object.
+ * @returns The total gas (DA + L2).
+ */
 function sumGas(gas: Gas): number {
   return (gas?.daGas ?? 0) + (gas?.l2Gas ?? 0);
 }
 
-// --- Profiler Class (Adapted from scripts/benchmark.ts) ---
-
+/**
+ * Profiles Aztec contract functions to measure gate counts and gas usage.
+ */
 export class Profiler {
+  /**
+   * Profiles a list of contract function interactions.
+   * @param fsToProfile - An array of contract function interactions to profile.
+   * @returns A promise that resolves to an array of profile results.
+   */
   async profile(fsToProfile: ContractFunctionInteraction[]): Promise<ProfileResult[]> {
     const results: ProfileResult[] = [];
     for (const f of fsToProfile) {
@@ -31,6 +45,12 @@ export class Profiler {
     return results;
   }
 
+  /**
+   * Saves the profiling results to a JSON file.
+   * If no results are provided, an empty report is saved.
+   * @param results - An array of profile results to save.
+   * @param filename - The name of the file to save the results to.
+   */
   async saveResults(results: ProfileResult[], filename: string) {
     if (!results.length) {
       console.log(`No results to save for ${filename}. Saving empty report.`);
@@ -74,6 +94,13 @@ export class Profiler {
     }
   }
 
+  /**
+   * Profiles a single contract function interaction.
+   * @param f - The contract function interaction to profile.
+   * @returns A promise that resolves to a profile result for the function.
+   *          Returns a result with FAILED in the name and zero counts/gas if profiling errors.
+   * @private
+   */
   async #profileOne(f: ContractFunctionInteraction): Promise<ProfileResult> {
     let name = 'unknown_function';
     try {
