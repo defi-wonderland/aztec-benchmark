@@ -6,6 +6,7 @@ on: workflow_dispatch
 jobs:
   publish-release:
     runs-on: ubuntu-latest
+    environment: prod
 
     steps:
       - name: Checkout repository
