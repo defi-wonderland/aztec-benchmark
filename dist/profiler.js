@@ -5,18 +5,34 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 };
 var _Profiler_instances, _Profiler_profileOne;
 import fs from 'node:fs';
-// --- Helper Functions ---
+/**
+ * Sums all numbers in an array.
+ * @param arr - The array of numbers to sum.
+ * @returns The sum of the numbers.
+ */
 function sumArray(arr) {
     return arr.reduce((a, b) => a + b, 0);
 }
+/**
+ * Sums DA and L2 gas components.
+ * @param gas - The gas object.
+ * @returns The total gas (DA + L2).
+ */
 function sumGas(gas) {
     return (gas?.daGas ?? 0) + (gas?.l2Gas ?? 0);
 }
-// --- Profiler Class (Adapted from scripts/benchmark.ts) ---
+/**
+ * Profiles Aztec contract functions to measure gate counts and gas usage.
+ */
 export class Profiler {
     constructor() {
         _Profiler_instances.add(this);
     }
+    /**
+     * Profiles a list of contract function interactions.
+     * @param fsToProfile - An array of contract function interactions to profile.
+     * @returns A promise that resolves to an array of profile results.
+     */
     async profile(fsToProfile) {
         const results = [];
         for (const f of fsToProfile) {
@@ -24,6 +40,12 @@ export class Profiler {
         }
         return results;
     }
+    /**
+     * Saves the profiling results to a JSON file.
+     * If no results are provided, an empty report is saved.
+     * @param results - An array of profile results to save.
+     * @param filename - The name of the file to save the results to.
+     */
     async saveResults(results, filename) {
         if (!results.length) {
             console.log(`No results to save for ${filename}. Saving empty report.`);
@@ -55,7 +77,15 @@ export class Profiler {
         }
     }
 }
-_Profiler_instances = new WeakSet(), _Profiler_profileOne = async function _Profiler_profileOne(f) {
+_Profiler_instances = new WeakSet(), _Profiler_profileOne = 
+/**
+ * Profiles a single contract function interaction.
+ * @param f - The contract function interaction to profile.
+ * @returns A promise that resolves to a profile result for the function.
+ *          Returns a result with FAILED in the name and zero counts/gas if profiling errors.
+ * @private
+ */
+async function _Profiler_profileOne(f) {
     let name = 'unknown_function';
     try {
         const executionPayload = await f.request();

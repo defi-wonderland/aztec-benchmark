@@ -16,14 +16,20 @@ export interface BenchmarkContext {
 }
 /** Gate counts for a specific circuit */
 export interface GateCount {
+    /** The name of the circuit. */
     circuitName: string;
+    /** The number of gates in the circuit. */
     gateCount: number;
 }
 /** Result of profiling a single function */
 export interface ProfileResult {
+    /** The name of the profiled function. */
     name: string;
+    /** The total gate count for the function. */
     totalGateCount: number;
+    /** Detailed gate counts for each circuit in the function. */
     gateCounts: GateCount[];
+    /** Gas usage information for the function. */
     gas: GasLimits;
 }
 /** Structure of the output JSON report */

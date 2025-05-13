@@ -1,10 +1,20 @@
-// action/index.cjs
 const core = require('@actions/core');
 const exec = require('@actions/exec');
 const fs = require('node:fs');
 const path = require('node:path');
 const { runComparison } = require('./comparison.cjs');
 
+/**
+ * Main function for the GitHub Action.
+ * This function is responsible for:
+ * - Reading action inputs (threshold, output path).
+ * - Setting up paths and suffixes for benchmark reports.
+ * - Executing the benchmark CLI to generate the 'latest' reports.
+ * - Running the comparison logic between 'base' and 'latest' reports.
+ * - Writing the comparison result to a markdown file.
+ * - Setting action outputs (markdown content and file path).
+ * It handles errors and sets the action to failed if any step fails.
+ */
 async function run() {
   try {
     const threshold = parseFloat(core.getInput('threshold'));
@@ -31,12 +41,12 @@ async function run() {
     const cliArgs = [];
     cliArgs.push('--suffix', latestSuffix);
 
-    core.info(`Executing: benchmark-cli ${cliArgs.join(' ')}`);
+    core.info(`Executing: aztec-benchmark ${cliArgs.join(' ')}`);
 
     const execOptions = {
         cwd: process.cwd()
     };
-    const exitCode = await exec.exec('yarn bench', cliArgs, execOptions);
+    const exitCode = await exec.exec('aztec-benchmark', cliArgs, execOptions);
     if (exitCode !== 0) {
         throw new Error(`Benchmark CLI execution failed with exit code ${exitCode}`);
     }

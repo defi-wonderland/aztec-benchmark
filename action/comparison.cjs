@@ -1,12 +1,26 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-// --- Helper Functions --- (Self-contained)
-
-// Assume these were the intended logic for gas extraction
+/**
+ * Extracts DA (Data Availability) gas from a benchmark result.
+ * @param {object} result - The benchmark result object.
+ * @returns {number} The DA gas value, or 0 if not found.
+ */
 const getDaGas = (result) => result?.gas?.gasLimits?.daGas ?? 0;
+/**
+ * Extracts L2 gas from a benchmark result.
+ * @param {object} result - The benchmark result object.
+ * @returns {number} The L2 gas value, or 0 if not found.
+ */
 const getL2Gas = (result) => result?.gas?.gasLimits?.l2Gas ?? 0;
 
+/**
+ * Formats the difference between two numbers as a string, including percentage change.
+ * Handles cases like zero main value (infinite increase) or zero pr value (100% decrease).
+ * @param {number} main - The base value.
+ * @param {number} pr - The new value (from Pull Request).
+ * @returns {string} A formatted string representing the difference, or an empty string if no significant change.
+ */
 const formatDiff = (main, pr) => {
   if (main === 0 && pr === 0) return ''; // Use empty string for no change if both zero
   if (main === 0) return '+Inf%'; // Handle infinite increase
@@ -23,6 +37,12 @@ const formatDiff = (main, pr) => {
   return `${sign}${diff.toLocaleString()} (${sign}${pct.toFixed(1)}%)`;
 };
 
+/**
+ * Determines an emoji status based on benchmark metric changes and a threshold.
+ * @param {object} metrics - An object containing main and pr values for gates, daGas, and l2Gas.
+ * @param {number} threshold - The percentage threshold for significant change.
+ * @returns {string} An emoji: '🚮' for removed, '🆕' for new, '🔴' for regression, '🟢' for improvement, '⚪' for no significant change.
+ */
 const getStatusEmoji = (metrics, threshold) => {
   const isRemoved = metrics.gates.pr === 0 && metrics.daGas.pr === 0 && metrics.l2Gas.pr === 0 &&
                   (metrics.gates.main > 0 || metrics.daGas.main > 0 || metrics.l2Gas.main > 0);
@@ -54,7 +74,13 @@ const getStatusEmoji = (metrics, threshold) => {
   return '⚪'; // No significant change / within threshold
 };
 
-// --- Contract Discovery --- (Scans report directory for pairs)
+/**
+ * Finds pairs of benchmark report files (base and PR/latest) in a directory.
+ * @param {string} reportsDir - The directory containing benchmark reports.
+ * @param {string} baseSuffix - The suffix for base report filenames (e.g., '_base').
+ * @param {string} prSuffix - The suffix for PR/latest report filenames (e.g., '_latest').
+ * @returns {Array<object>} An array of pairs, each with contractName, baseJsonPath, and prJsonPath.
+ */
 function findBenchmarkPairs(reportsDir, baseSuffix, prSuffix) {
   const pairs = [];
   const prSuffixPattern = `${prSuffix}.benchmark.json`;
@@ -92,7 +118,12 @@ function findBenchmarkPairs(reportsDir, baseSuffix, prSuffix) {
   return pairs;
 }
 
-// --- Comparison Logic --- (Generates Markdown table - Updated to accept paths)
+/**
+ * Generates an HTML table comparing benchmark results for a single contract.
+ * @param {object} pair - An object containing contractName, baseJsonPath, and prJsonPath.
+ * @param {number} threshold - The percentage threshold for highlighting regressions.
+ * @returns {string} An HTML string representing the comparison table, or an error message.
+ */
 function generateContractComparisonTable(pair, threshold) {
   const { contractName, baseJsonPath, prJsonPath } = pair;
   console.log(` Comparing: ${baseJsonPath} vs ${prJsonPath}`);
@@ -197,7 +228,16 @@ function generateContractComparisonTable(pair, threshold) {
   return output.join('\n');
 };
 
-// --- Main Exported Function --- (Updated Logging)
+/**
+ * Main function to run the benchmark comparison.
+ * It finds benchmark report pairs, generates comparison tables for each, and combines them into a single markdown output.
+ * @param {object} inputs - The input parameters for the comparison.
+ * @param {string} inputs.reportsDir - Directory where benchmark reports are stored.
+ * @param {string} inputs.baseSuffix - Suffix for baseline report files.
+ * @param {string} inputs.prSuffix - Suffix for PR/current report files.
+ * @param {number} inputs.threshold - Percentage threshold for regressions.
+ * @returns {string} A markdown string containing the full comparison report.
+ */
 function runComparison(inputs) {
   const { reportsDir, baseSuffix, prSuffix, threshold } = inputs;
   console.log("Comparison script starting...");
