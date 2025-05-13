@@ -1,10 +1,7 @@
 import type {
   ContractFunctionInteraction,
 } from '@aztec/aztec.js';
-// Remove the failed import attempt
-// import type { Gas, GasLimits } from '@aztec/aztec.js/types';
 
-// Define the base Gas type locally
 /** Simplified Gas type (contains actual gas values) */
 export type Gas = {
   /** Data Availability gas */
@@ -13,33 +10,33 @@ export type Gas = {
   l2Gas: number;
 };
 
-// Define the structure returned by estimateGas locally
 /** Structure holding execution and teardown gas */
 export type GasLimits = {
   gasLimits: Gas;
   teardownGasLimits: Gas;
 };
 
-// --- Types (Moved from scripts/benchmark.ts) ---
-
 /** Benchmark specific setup/teardown context */
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface BenchmarkContext {
-  // Users can extend this in their benchmark files if needed for setup/teardown state
-}
+export interface BenchmarkContext {}
 
 /** Gate counts for a specific circuit */
 export interface GateCount {
+  /** The name of the circuit. */
   circuitName: string;
+  /** The number of gates in the circuit. */
   gateCount: number;
 }
 
 /** Result of profiling a single function */
 export interface ProfileResult {
+  /** The name of the profiled function. */
   name: string;
+  /** The total gate count for the function. */
   totalGateCount: number;
+  /** Detailed gate counts for each circuit in the function. */
   gateCounts: GateCount[];
-  // Revert to the nested structure using local types
+  /** Gas usage information for the function. */
   gas: GasLimits;
 }
 

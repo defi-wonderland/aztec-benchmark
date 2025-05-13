@@ -1,22 +1,34 @@
 {
-  "name": "benchmark-cli",
+  "name": "@defi-wonderland/aztec-benchmark",
   "version": "1.0.0",
   "description": "CLI tool and GitHub Action for Aztec contract benchmarking",
-  "main": "dist/cli/index.js",
-  "types": "dist/cli/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
   "bin": {
-    "benchmark-cli": "./dist/cli/cli.js"
+    "aztec-benchmark": "bin/aztec-benchmark"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && ncc build action/index.cjs -o action/dist -m -C",
     "start": "tsx cli/cli.ts"
   },
   "files": [
     "dist",
-    "action/action.yml",
-    "action/index.js",
-    "action/comparison.js"
+    "action",
+    "bin",
+    "README.md",
+    "LICENSE"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/defi-wonderland/aztec-benchmark-diff.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "license": "MIT",
   "dependencies": {
     "@actions/core": "^1.10.1",
@@ -25,8 +37,12 @@
     "@iarna/toml": "^2.2.5",
     "@types/node": "^22.15.3",
     "commander": "^13.1.0",
+    "esbuild": "^0.23.1",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"
   },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
+  "devDependencies": {
+    "@vercel/ncc": "^0.38.3"
+  }
 }
