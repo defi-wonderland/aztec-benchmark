@@ -1,4 +1,4 @@
-# @defi-wonderland/aztec-benchmark
+# Aztec Benchmark
 
 **CLI tool for running Aztec contract benchmarks.**
 
