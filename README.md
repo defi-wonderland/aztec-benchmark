@@ -151,10 +151,10 @@ export default class MyContractBenchmark extends Benchmark {
 
   // Optional cleanup phase
   async teardown(context: MyBenchmarkContext): Promise<void> {
-    // console.log('Cleaning up benchmark environment...');
-    // if (context && context.pxe) { 
-    //   await context.pxe.stop(); 
-    // }
+    console.log('Cleaning up benchmark environment...');
+    if (context && context.pxe) { 
+      await context.pxe.stop(); 
+    }
   }
 }
 ```
