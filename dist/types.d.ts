@@ -32,6 +32,13 @@ export interface ProfileResult {
     /** Gas usage information for the function. */
     gas: GasLimits;
 }
+/** Defines a contract interaction to be benchmarked, with a custom display name. */
+export interface NamedBenchmarkedInteraction {
+    /** The contract function interaction from Aztec.js. */
+    interaction: ContractFunctionInteraction;
+    /** The custom name to be used for this benchmark in reports. */
+    name: string;
+}
 /** Structure of the output JSON report */
 export interface ProfileReport {
     /** Total gate counts keyed by function name */
@@ -45,8 +52,8 @@ export interface ProfileReport {
 export declare abstract class BenchmarkBase {
     /** Optional setup function run before benchmarks */
     abstract setup?(): Promise<BenchmarkContext>;
-    /** Function returning the methods to benchmark */
-    abstract getMethods(context: BenchmarkContext): ContractFunctionInteraction[];
+    /** Function returning the methods to benchmark. Can be a mix of plain interactions or named interactions. */
+    abstract getMethods(context: BenchmarkContext): Array<ContractFunctionInteraction | NamedBenchmarkedInteraction>;
     /** Optional teardown function run after benchmarks (no longer abstract) */
     teardown?(context: BenchmarkContext): Promise<void>;
 }

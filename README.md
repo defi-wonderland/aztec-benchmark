@@ -79,24 +79,69 @@ npx aztec-benchmark --contracts token another_contract --output-dir ./benchmark_
 ## Writing Benchmarks
 
 Benchmarks are TypeScript classes extending `BenchmarkBase` from this package.
+Each entry in the array returned by `getMethods` can either be a plain `ContractFunctionInteraction` 
+(in which case the benchmark name is auto-derived) or a `NamedBenchmarkedInteraction` object 
+(which includes the `interaction` and a custom `name` for reporting).
 
 ```ts
-import { BenchmarkBase, BenchmarkContext } from '@defi-wonderland/aztec-benchmark';
-import { /* Contract, AccountWallet, etc. */ } from '@aztec/aztec.js';
+import { BenchmarkBase, BenchmarkContext, NamedBenchmarkedInteraction } from '@defi-wonderland/aztec-benchmark';
+import { Contract, AccountWallet, ContractFunctionInteraction /*, etc. */ } from '@aztec/aztec.js'; // Assuming specific imports
+
+// A hypothetical contract interface for the example
+interface MyExampleContract extends Contract {
+  methods: {
+    transfer: (amount: bigint) => ContractFunctionInteraction;
+    another_function: (arg1: any, arg2: any) => ContractFunctionInteraction;
+    simple_call: () => ContractFunctionInteraction;
+  };
+}
 
 export default class MyBenchmark extends BenchmarkBase {
+  // Example context, replace with your actual needs
+  declare context: {
+    contract: MyExampleContract; 
+    wallet: AccountWallet;   
+  };
+
   // Runs once before benchmarks.
   async setup(): Promise<BenchmarkContext> {
-    // Deploy contracts, set up accounts, return context.
-    // const contract = await MyContract.deploy(wallet).send().deployed();
-    return { /* contract, wallet, etc. */ };
+    // const wallet = await getWallet(); // Your wallet setup
+    // const contract = await MyExampleContract.deploy(wallet).send().deployed() as MyExampleContract;
+    // this.context = { contract, wallet };
+    // return this.context;
+    // For the example to run, ensure this.context is populated in a real setup.
+    // This is a placeholder if you don't have a full setup for direct README testing.
+    if (!this.context) { 
+      // @ts-ignore - Mocking for README example viability
+      this.context = { contract: { methods: { 
+        transfer: (amount: bigint) => ({ dummy: 'interaction' } as unknown as ContractFunctionInteraction),
+        another_function: (arg1: any, arg2: any) => ({ dummy: 'interaction'} as unknown as ContractFunctionInteraction),
+        simple_call: () => ({ dummy: 'interaction' } as unknown as ContractFunctionInteraction),
+      } } }; 
+    }
+    return this.context;
   }
 
-  // Returns Aztec.js ContractFunctionInteraction[] to benchmark.
-  async getMethods(context: BenchmarkContext) {
-    // const { contract, wallet } = context;
-    // return [ contract.methods.some_function(arg1) ];
-    return []; 
+  // Returns an array of interactions to benchmark. 
+  // Each can be a plain ContractFunctionInteraction or a NamedBenchmarkedInteraction object.
+  async getMethods(context: BenchmarkContext): Promise<Array<ContractFunctionInteraction | NamedBenchmarkedInteraction>> {
+    const { contract } = context as typeof this.context; 
+    
+    const transferSmallInteraction = contract.methods.transfer(1n);
+    const transferLargeInteraction = contract.methods.transfer(100000n);
+    const anotherComplexInteraction = contract.methods.another_function("data", { value: 123 });
+    const simpleInteraction = contract.methods.simple_call();
+
+    return [
+      // Example of a named interaction
+      { interaction: transferSmallInteraction, name: "Transfer Small Amount (1)" }, 
+      // Another named interaction
+      { interaction: transferLargeInteraction, name: "Transfer Large Amount (100000)" },
+      // Example of a plain interaction - name will be auto-derived (e.g., 'another_function')
+      anotherComplexInteraction, 
+      // Another plain interaction - name will be auto-derived (e.g., 'simple_call')
+      simpleInteraction 
+    ];
   }
 
   // Optional cleanup.
@@ -105,12 +150,16 @@ export default class MyBenchmark extends BenchmarkBase {
 ```
 
 **Note:** Your benchmark code needs a valid Aztec project setup to interact with contracts.
+Your `BenchmarkBase` implementation is responsible for constructing the `ContractFunctionInteraction` objects.
+If you provide a `NamedBenchmarkedInteraction` object, its `name` field will be used in reports. 
+If you provide a plain `ContractFunctionInteraction`, the tool will attempt to derive a name from the interaction (e.g., the method name).
 
 ---
 
 ## Benchmark Output
 
 Your `BenchmarkBase` implementation is responsible for measuring and outputting performance data (e.g., as JSON). The comparison action uses this output.
+Each entry in the output will be identified by the custom `name` you provided (if any) or the auto-derived name.
 
 --- 
 
