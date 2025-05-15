@@ -8,6 +8,7 @@ import {
   type ProfileReport,
   type Gas,
   type GasLimits,
+  type NamedBenchmarkedInteraction,
 } from './types.js';
 
 /**
@@ -33,14 +34,21 @@ function sumGas(gas: Gas): number {
  */
 export class Profiler {
   /**
-   * Profiles a list of contract function interactions.
-   * @param fsToProfile - An array of contract function interactions to profile.
+   * Profiles a list of contract function interactions. 
+   * Items can be plain interactions or objects with an interaction and a custom name.
+   * @param fsToProfile - An array of items to profile.
    * @returns A promise that resolves to an array of profile results.
    */
-  async profile(fsToProfile: ContractFunctionInteraction[]): Promise<ProfileResult[]> {
+  async profile(fsToProfile: Array<ContractFunctionInteraction | NamedBenchmarkedInteraction>): Promise<ProfileResult[]> {
     const results: ProfileResult[] = [];
-    for (const f of fsToProfile) {
-      results.push(await this.#profileOne(f));
+    for (const item of fsToProfile) {
+      if ('interaction' in item && 'name' in item) {
+        // This is a NamedBenchmarkedInteraction object
+        results.push(await this.#profileOne(item.interaction, item.name));
+      } else {
+        // This is a plain ContractFunctionInteraction
+        results.push(await this.#profileOne(item as ContractFunctionInteraction)); // Pass undefined for customName
+      }
     }
     return results;
   }
@@ -97,27 +105,37 @@ export class Profiler {
   /**
    * Profiles a single contract function interaction.
    * @param f - The contract function interaction to profile.
+   * @param customName - Optional user-defined name for this benchmark entry. If not provided, name is derived.
    * @returns A promise that resolves to a profile result for the function.
    *          Returns a result with FAILED in the name and zero counts/gas if profiling errors.
    * @private
    */
-  async #profileOne(f: ContractFunctionInteraction): Promise<ProfileResult> {
-    let name = 'unknown_function';
-    try {
-      const executionPayload = await f.request();
-      if (executionPayload.calls && executionPayload.calls.length > 0) {
-        const firstCall = executionPayload.calls[0];
-        name = firstCall?.name ?? firstCall?.selector?.toString() ?? 'unknown_function';
-      } else {
-        console.warn('No calls found in execution payload.');
-      }
-    } catch (e: any) {
-      const potentialMethodName = (f as any).methodName;
-      if (potentialMethodName) {
-          name = potentialMethodName;
-          console.warn(`Could not simulate request (${e.message}), using interaction.methodName as fallback: ${name}`);
-      } else {
-          console.warn(`Could not determine function name from request simulation: ${e.message}`);
+  async #profileOne(f: ContractFunctionInteraction, customName?: string): Promise<ProfileResult> {
+    let name: string;
+    if (customName) {
+      name = customName;
+    } else {
+      // Name discovery logic (reinstated)
+      try {
+        const executionPayload = await f.request(); // Note: f.request() might be an issue if f is already a PxeSimoneResponse - check aztec.js docs
+        if (executionPayload.calls && executionPayload.calls.length > 0) {
+          const firstCall = executionPayload.calls[0];
+          // Attempt to get a meaningful name
+          name = firstCall?.name ?? firstCall?.selector?.toString() ?? 'unknown_function';
+        } else {
+          name = 'unknown_function_no_calls';
+          console.warn('No calls found in execution payload for name discovery.');
+        }
+      } catch (e: any) {
+        // Fallback if request() fails or doesn't yield a name
+        const potentialMethodName = (f as any).methodName; // methodName is not a standard prop, but might exist on some wrapped objects
+        if (potentialMethodName) {
+            name = potentialMethodName;
+            console.warn(`Could not simulate request for name discovery (${e.message}), using interaction.methodName as fallback: ${name}`);
+        } else {
+            name = 'unknown_function_request_failed';
+            console.warn(`Could not determine function name from request simulation: ${e.message}`);
+        }
       }
     }
 

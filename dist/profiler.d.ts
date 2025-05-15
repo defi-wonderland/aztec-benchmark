@@ -1,5 +1,5 @@
 import { type ContractFunctionInteraction } from '@aztec/aztec.js';
-import { type ProfileResult } from './types.js';
+import { type ProfileResult, type NamedBenchmarkedInteraction } from './types.js';
 /**
  * Profiles Aztec contract functions to measure gate counts and gas usage.
  */
@@ -7,10 +7,11 @@ export declare class Profiler {
     #private;
     /**
      * Profiles a list of contract function interactions.
-     * @param fsToProfile - An array of contract function interactions to profile.
+     * Items can be plain interactions or objects with an interaction and a custom name.
+     * @param fsToProfile - An array of items to profile.
      * @returns A promise that resolves to an array of profile results.
      */
-    profile(fsToProfile: ContractFunctionInteraction[]): Promise<ProfileResult[]>;
+    profile(fsToProfile: Array<ContractFunctionInteraction | NamedBenchmarkedInteraction>): Promise<ProfileResult[]>;
     /**
      * Saves the profiling results to a JSON file.
      * If no results are provided, an empty report is saved.

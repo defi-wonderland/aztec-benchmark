@@ -30,13 +30,21 @@ export class Profiler {
     }
     /**
      * Profiles a list of contract function interactions.
-     * @param fsToProfile - An array of contract function interactions to profile.
+     * Items can be plain interactions or objects with an interaction and a custom name.
+     * @param fsToProfile - An array of items to profile.
      * @returns A promise that resolves to an array of profile results.
      */
     async profile(fsToProfile) {
         const results = [];
-        for (const f of fsToProfile) {
-            results.push(await __classPrivateFieldGet(this, _Profiler_instances, "m", _Profiler_profileOne).call(this, f));
+        for (const item of fsToProfile) {
+            if ('interaction' in item && 'name' in item) {
+                // This is a NamedBenchmarkedInteraction object
+                results.push(await __classPrivateFieldGet(this, _Profiler_instances, "m", _Profiler_profileOne).call(this, item.interaction, item.name));
+            }
+            else {
+                // This is a plain ContractFunctionInteraction
+                results.push(await __classPrivateFieldGet(this, _Profiler_instances, "m", _Profiler_profileOne).call(this, item)); // Pass undefined for customName
+            }
         }
         return results;
     }
@@ -81,30 +89,41 @@ _Profiler_instances = new WeakSet(), _Profiler_profileOne =
 /**
  * Profiles a single contract function interaction.
  * @param f - The contract function interaction to profile.
+ * @param customName - Optional user-defined name for this benchmark entry. If not provided, name is derived.
  * @returns A promise that resolves to a profile result for the function.
  *          Returns a result with FAILED in the name and zero counts/gas if profiling errors.
  * @private
  */
-async function _Profiler_profileOne(f) {
-    let name = 'unknown_function';
-    try {
-        const executionPayload = await f.request();
-        if (executionPayload.calls && executionPayload.calls.length > 0) {
-            const firstCall = executionPayload.calls[0];
-            name = firstCall?.name ?? firstCall?.selector?.toString() ?? 'unknown_function';
-        }
-        else {
-            console.warn('No calls found in execution payload.');
-        }
+async function _Profiler_profileOne(f, customName) {
+    let name;
+    if (customName) {
+        name = customName;
     }
-    catch (e) {
-        const potentialMethodName = f.methodName;
-        if (potentialMethodName) {
-            name = potentialMethodName;
-            console.warn(`Could not simulate request (${e.message}), using interaction.methodName as fallback: ${name}`);
+    else {
+        // Name discovery logic (reinstated)
+        try {
+            const executionPayload = await f.request(); // Note: f.request() might be an issue if f is already a PxeSimoneResponse - check aztec.js docs
+            if (executionPayload.calls && executionPayload.calls.length > 0) {
+                const firstCall = executionPayload.calls[0];
+                // Attempt to get a meaningful name
+                name = firstCall?.name ?? firstCall?.selector?.toString() ?? 'unknown_function';
+            }
+            else {
+                name = 'unknown_function_no_calls';
+                console.warn('No calls found in execution payload for name discovery.');
+            }
         }
-        else {
-            console.warn(`Could not determine function name from request simulation: ${e.message}`);
+        catch (e) {
+            // Fallback if request() fails or doesn't yield a name
+            const potentialMethodName = f.methodName; // methodName is not a standard prop, but might exist on some wrapped objects
+            if (potentialMethodName) {
+                name = potentialMethodName;
+                console.warn(`Could not simulate request for name discovery (${e.message}), using interaction.methodName as fallback: ${name}`);
+            }
+            else {
+                name = 'unknown_function_request_failed';
+                console.warn(`Could not determine function name from request simulation: ${e.message}`);
+            }
         }
     }
     console.log(`Profiling ${name}...`);
