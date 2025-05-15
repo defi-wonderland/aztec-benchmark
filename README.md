@@ -1,4 +1,5 @@
 # Aztec Benchmark
+[![npm version](https://badge.fury.io/js/%40defi-wonderland%2Faztec-benchmark.svg)](https://www.npmjs.com/package/@defi-wonderland/aztec-benchmark)
 
 **CLI tool for running Aztec contract benchmarks.**
 
