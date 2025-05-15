@@ -93,13 +93,14 @@ program
                 console.log(`Setup complete for ${contractName}.`);
             }
             console.log(`Getting methods to benchmark for ${contractName}...`);
-            const methodsToBenchmark = benchmarkInstance.getMethods(runContext);
-            if (!Array.isArray(methodsToBenchmark) || methodsToBenchmark.length === 0) {
+            const interactionsToBenchmark = benchmarkInstance.getMethods(runContext);
+            if (!Array.isArray(interactionsToBenchmark) || interactionsToBenchmark.length === 0) {
                 console.warn(`No benchmark methods returned by getMethods for ${contractName}. Saving empty report.`);
+                await profiler.saveResults([], outputJsonPath);
             }
             else {
-                console.log(`Profiling ${methodsToBenchmark.length} methods for ${contractName}...`);
-                const results = await profiler.profile(methodsToBenchmark);
+                console.log(`Profiling ${interactionsToBenchmark.length} methods for ${contractName}...`);
+                const results = await profiler.profile(interactionsToBenchmark);
                 await profiler.saveResults(results, outputJsonPath);
             }
             if (typeof benchmarkInstance.teardown === 'function') {

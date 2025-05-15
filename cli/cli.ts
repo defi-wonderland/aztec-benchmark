@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import toml from '@iarna/toml';
 import { Profiler } from './profiler.js';
-import { BenchmarkBase, BenchmarkContext, type ProfileResult } from './types.js';
+import { BenchmarkBase, BenchmarkContext, type ProfileResult, type NamedBenchmarkedInteraction } from './types.js';
+import type { ContractFunctionInteraction } from '@aztec/aztec.js';
 
 /**
  * Represents the structure of the [benchmark] section in Nargo.toml.
@@ -126,13 +127,14 @@ program
         }
 
         console.log(`Getting methods to benchmark for ${contractName}...`);
-        const methodsToBenchmark = benchmarkInstance.getMethods(runContext);
+        const interactionsToBenchmark: Array<ContractFunctionInteraction | NamedBenchmarkedInteraction> = benchmarkInstance.getMethods(runContext);
 
-        if (!Array.isArray(methodsToBenchmark) || methodsToBenchmark.length === 0) {
+        if (!Array.isArray(interactionsToBenchmark) || interactionsToBenchmark.length === 0) {
           console.warn(`No benchmark methods returned by getMethods for ${contractName}. Saving empty report.`);
+          await profiler.saveResults([], outputJsonPath);
         } else {
-          console.log(`Profiling ${methodsToBenchmark.length} methods for ${contractName}...`);
-          const results = await profiler.profile(methodsToBenchmark);
+          console.log(`Profiling ${interactionsToBenchmark.length} methods for ${contractName}...`);
+          const results = await profiler.profile(interactionsToBenchmark);
           await profiler.saveResults(results, outputJsonPath);
         }
 

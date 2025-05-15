@@ -1,4 +1,4 @@
-# @defi-wonderland/aztec-benchmark
+# Aztec Benchmark
 
 **CLI tool for running Aztec contract benchmarks.**
 
@@ -79,38 +79,101 @@ npx aztec-benchmark --contracts token another_contract --output-dir ./benchmark_
 ## Writing Benchmarks
 
 Benchmarks are TypeScript classes extending `BenchmarkBase` from this package.
+Each entry in the array returned by `getMethods` can either be a plain `ContractFunctionInteraction` 
+(in which case the benchmark name is auto-derived) or a `NamedBenchmarkedInteraction` object 
+(which includes the `interaction` and a custom `name` for reporting).
 
 ```ts
-import { BenchmarkBase, BenchmarkContext } from '@defi-wonderland/aztec-benchmark';
-import { /* Contract, AccountWallet, etc. */ } from '@aztec/aztec.js';
+import {
+  Benchmark, // Alias for BenchmarkBase
+  type BenchmarkContext, 
+  type NamedBenchmarkedInteraction 
+} from '@defi-wonderland/aztec-benchmark';
+import {
+  type AccountWallet,
+  type ContractFunctionInteraction,
+  type PXE,
+  type Contract, // Generic Contract type from Aztec.js
+  createPXEClient, // Example import
+  getInitialTestAccountsWallets // Example import
+} from '@aztec/aztec.js';
+// import { YourSpecificContract } from '../artifacts/YourSpecificContract.js'; // Replace with your actual contract artifact
 
-export default class MyBenchmark extends BenchmarkBase {
-  // Runs once before benchmarks.
-  async setup(): Promise<BenchmarkContext> {
-    // Deploy contracts, set up accounts, return context.
-    // const contract = await MyContract.deploy(wallet).send().deployed();
-    return { /* contract, wallet, etc. */ };
+// 1. Define a specific context for your benchmark (optional but good practice)
+interface MyBenchmarkContext extends BenchmarkContext {
+  pxe: PXE;
+  deployer: AccountWallet;
+  contract: Contract; // Use the generic Contract type or your specific contract type
+}
+
+export default class MyContractBenchmark extends Benchmark {
+  // Runs once before all benchmark methods.
+  async setup(): Promise<MyBenchmarkContext> {
+    console.log('Setting up benchmark environment...');
+    const pxe = createPXEClient(process.env.PXE_URL || 'http://localhost:8080');
+    const [deployer] = await getInitialTestAccountsWallets(pxe);
+    
+    //  Deploy your contract (replace YourSpecificContract with your actual contract class)
+    const deployedContract = await YourSpecificContract.deploy(deployer, /* constructor args */).send().deployed();
+    const contract = await YourSpecificContract.at(deployedContract.address, deployer);
+    console.log('Contract deployed at:', contract.address.toString());
+
+    return { pxe, deployer, contract }; 
   }
 
-  // Returns Aztec.js ContractFunctionInteraction[] to benchmark.
-  async getMethods(context: BenchmarkContext) {
-    // const { contract, wallet } = context;
-    // return [ contract.methods.some_function(arg1) ];
-    return []; 
+  // Returns an array of interactions to benchmark. 
+  async getMethods(context: MyBenchmarkContext): Promise<Array<ContractFunctionInteraction | NamedBenchmarkedInteraction>> {
+    // Ensure context is available (it should be if setup ran correctly)
+    if (!context || !context.contract) {
+      // In a real scenario, setup() must initialize the context properly.
+      // Throwing an error or returning an empty array might be appropriate here if setup failed.
+      console.error("Benchmark context or contract not initialized in setup(). Skipping getMethods.");
+      return [];
+    }
+    
+    const { contract, deployer } = context;
+    const recipient = deployer.getAddress(); // Example recipient
+
+    // Replace `contract.methods.someMethodName` with actual methods from your contract.
+    const interactionPlain = contract.methods.transfer(recipient, 100n); 
+    const interactionNamed1 = contract.methods.someOtherMethod("test_value_1");
+    const interactionNamed2 = contract.methods.someOtherMethod("test_value_2");
+
+    return [
+      // Example of a plain interaction - name will be auto-derived
+      interactionPlain,
+      // Example of a named interaction
+      { interaction: interactionNamed1, name: "Some Other Method (value 1)" }, 
+      // Another named interaction
+      { interaction: interactionNamed2, name: "Some Other Method (value 2)" }, 
+    ];
   }
 
-  // Optional cleanup.
-  async teardown(context: BenchmarkContext): Promise<void> {}
+  // Optional cleanup phase
+  async teardown(context: MyBenchmarkContext): Promise<void> {
+    console.log('Cleaning up benchmark environment...');
+    if (context && context.pxe) { 
+      await context.pxe.stop(); 
+    }
+  }
 }
 ```
 
 **Note:** Your benchmark code needs a valid Aztec project setup to interact with contracts.
+Your `BenchmarkBase` implementation is responsible for constructing the `ContractFunctionInteraction` objects.
+If you provide a `NamedBenchmarkedInteraction` object, its `name` field will be used in reports. 
+If you provide a plain `ContractFunctionInteraction`, the tool will attempt to derive a name from the interaction (e.g., the method name).
+
+### Wonderland's Usage Example
+
+You can find how we use this tool for benchmarking our Aztec contracts in [`aztec-standards`](https://github.com/defi-wonderland/aztec-standards/tree/dev/benchmarks).
 
 ---
 
 ## Benchmark Output
 
 Your `BenchmarkBase` implementation is responsible for measuring and outputting performance data (e.g., as JSON). The comparison action uses this output.
+Each entry in the output will be identified by the custom `name` you provided (if any) or the auto-derived name.
 
 --- 
 
