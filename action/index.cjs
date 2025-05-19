@@ -45,20 +45,20 @@ async function run() {
     core.info(`Executing: aztec-benchmark ${cliArgs.join(' ')}`);
 
     const execOptions = {
-        cwd: process.cwd()
+      cwd: process.cwd()
     };
-    const exitCode = await exec.exec('aztec-benchmark', cliArgs, execOptions);
+    const exitCode = await exec.exec('npx aztec-benchmark', cliArgs, execOptions);
     if (exitCode !== 0) {
-        throw new Error(`Benchmark CLI execution failed with exit code ${exitCode}`);
+      throw new Error(`Benchmark CLI execution failed with exit code ${exitCode}`);
     }
     core.endGroup();
 
     core.startGroup('Comparing benchmark reports');
     const comparisonInputs = {
-        reportsDir,
-        baseSuffix,
-        prSuffix: currentSuffix,
-        threshold
+      reportsDir,
+      baseSuffix,
+      prSuffix: currentSuffix,
+      threshold
     };
     const markdownResult = runComparison(comparisonInputs);
     core.endGroup();
