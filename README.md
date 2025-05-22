@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Aztec Benchmark Diff GitHub Action
 
 This GitHub Action automatically runs benchmarks for Aztec contracts, compares the results against a baseline, and generates a Markdown report highlighting performance changes (gas usage, gate counts). It's designed to be integrated into CI/CD workflows to monitor performance regressions or improvements in pull requests.
@@ -318,4 +317,3 @@ This action is typically used in a workflow that runs on pull requests. It assum
 ```
 
 Refer to the `action/action.yml` file for the definitive inputs and description.
->>>>>>> 540106d49d1fc326fc97378e975930a1c76eb765
