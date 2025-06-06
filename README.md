@@ -55,6 +55,7 @@ The paths to the `.benchmark.ts` files are relative to the `Nargo.toml` file.
 
 - `-c, --contracts <names...>`: Specify which contracts (keys from the `[benchmark]` section) to run. If omitted, runs all defined benchmarks.
 - `--config <path>`: Path to your `Nargo.toml` file (default: `./Nargo.toml`).
+- `-p, --path <path>`: Path to the benchmark file relative to the nargo.toml (default: `""`).
 - `-o, --output-dir <path>`: Directory to save benchmark JSON reports (default: `./benchmarks`).
 - `-s, --suffix <suffix>`: Optional suffix to append to report filenames (e.g., `_pr` results in `token_pr.benchmark.json`).
 
