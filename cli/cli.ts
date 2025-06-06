@@ -23,6 +23,7 @@ program
   .description('Runs benchmarks defined in Nargo.toml and associated *.benchmark.ts files.')
   .option('-c, --contracts <names...>', 'Specify contracts to benchmark by name (defined in Nargo.toml)')
   .option('--config <path>', 'Path to the Nargo.toml file', './Nargo.toml')
+  .option('-p, --path <path>', 'Path to the benchmark file', '')
   .option('-o, --output-dir <path>', 'Directory to save benchmark reports', './benchmarks')
   .option('-s, --suffix <suffix>', 'Optional suffix to append to the report filename (e.g., _pr)')
   /**
@@ -31,10 +32,11 @@ program
    * @param options - The command line options.
    * @param options.contracts - Specific contracts to benchmark.
    * @param options.config - Path to the Nargo.toml file.
+   * @param options.path - Path to the benchmark file.
    * @param options.outputDir - Directory to save reports.
    * @param options.suffix - Optional suffix for report filenames.
    */
-  .action(async (options: { contracts?: string[], config: string, outputDir: string, suffix?: string }) => {
+  .action(async (options: { contracts?: string[], config: string, path: string, outputDir: string, suffix?: string }) => {
 
     const nargoTomlPath = path.resolve(process.cwd(), options.config);
     const outputDir = path.resolve(process.cwd(), options.outputDir);
@@ -94,7 +96,7 @@ program
     // Iterate over the filtered contract names
     for (const contractName of contractsToRunNames) {
       const benchmarkFileName = availableBenchmarks[contractName];
-      const benchmarkFilePath = path.resolve(path.dirname(nargoTomlPath), benchmarkFileName);
+      const benchmarkFilePath = path.resolve(path.dirname(nargoTomlPath), options.path, benchmarkFileName);
       const outputFilename = `${contractName}${suffix}.benchmark.json`;
       const outputJsonPath = path.join(outputDir, outputFilename);
 
