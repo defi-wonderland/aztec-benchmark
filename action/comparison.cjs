@@ -85,10 +85,14 @@ function findBenchmarkPairs(reportsDir, baseSuffix, prSuffix) {
   const pairs = [];
   const prSuffixPattern = `${prSuffix}.benchmark.json`;
   const baseSuffixPattern = `${baseSuffix}.benchmark.json`;
-
+  console.log('reportsDir', reportsDir);
+  console.log('baseSuffixPattern', baseSuffixPattern);
+  console.log('prSuffixPattern', prSuffixPattern);
   try {
     const files = fs.readdirSync(reportsDir);
+    console.log('files', files);
     for (const file of files) {
+      console.log('file', file);
       if (file.endsWith(prSuffixPattern)) {
         // Extract contract name from PR filename
         const contractName = file.substring(0, file.length - prSuffixPattern.length);
@@ -96,7 +100,7 @@ function findBenchmarkPairs(reportsDir, baseSuffix, prSuffix) {
         const baseFilename = `${contractName}${baseSuffixPattern}`;
         const baseJsonPath = path.join(reportsDir, baseFilename);
         const prJsonPath = path.join(reportsDir, file);
-
+        console.log('baseJsonPath', baseJsonPath);
         // Check if the corresponding baseline file exists
         if (fs.existsSync(baseJsonPath)) {
           pairs.push({
@@ -132,7 +136,7 @@ function generateContractComparisonTable(pair, threshold) {
   if (!fs.existsSync(baseJsonPath) || !fs.existsSync(prJsonPath)) {
     return `*Error: One or both report files missing for ${contractName} (this should not happen)*`;
   }
-
+  console.log('aaaaaaaaaa')
   let mainData, prData;
   try {
      mainData = JSON.parse(fs.readFileSync(baseJsonPath, 'utf-8'));
@@ -140,7 +144,7 @@ function generateContractComparisonTable(pair, threshold) {
   } catch(e) {
      return `*Error parsing benchmark JSON for ${contractName}: ${e.message}*`;
   }
-
+  console.log('bbbbbbbbb')
    if (!mainData || !mainData.results || !prData || !prData.results) {
     return `*Skipping ${contractName}: Invalid JSON structure (missing results array).*`;
   }
@@ -150,7 +154,7 @@ function generateContractComparisonTable(pair, threshold) {
     ...mainData.results.map(r => r.name),
     ...prData.results.map(r => r.name)
   ]);
-
+  console.log('allFunctionNames', allFunctionNames);
   for (const name of allFunctionNames) {
      if (!name || name.startsWith('unknown_function') || name.includes('(FAILED)') || name === 'BENCHMARK_RUNNER_ERROR') {
       console.log(` Skipping comparison for malformed/failed entry: ${name}`);
@@ -158,7 +162,9 @@ function generateContractComparisonTable(pair, threshold) {
     }
     const mainResult = mainData.results.find((r) => r.name === name);
     const prResult = prData.results.find((r) => r.name === name);
-
+    console.log(name);
+    console.log(mainResult);
+    console.log(prResult);
     comparison[name] = {
       gates: { main: mainResult?.totalGateCount ?? 0, pr: prResult?.totalGateCount ?? 0 },
       daGas: { main: getDaGas(mainResult), pr: getDaGas(prResult) },
