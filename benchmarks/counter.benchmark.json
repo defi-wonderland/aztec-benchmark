@@ -1,0 +1,67 @@
+{
+  "summary": {
+    "increment": 312640,
+    "unknown_function_request_failed (FAILED)": 0
+  },
+  "results": [
+    {
+      "name": "increment",
+      "totalGateCount": 312640,
+      "gateCounts": [
+        {
+          "circuitName": "SchnorrAccount:entrypoint",
+          "gateCount": 22541
+        },
+        {
+          "circuitName": "private_kernel_init",
+          "gateCount": 41309
+        },
+        {
+          "circuitName": "Counter:increment",
+          "gateCount": 5792
+        },
+        {
+          "circuitName": "private_kernel_inner",
+          "gateCount": 92632
+        },
+        {
+          "circuitName": "private_kernel_reset",
+          "gateCount": 101131
+        },
+        {
+          "circuitName": "private_kernel_tail",
+          "gateCount": 49235
+        }
+      ],
+      "gas": {
+        "gasLimits": {
+          "daGas": 1690,
+          "l2Gas": 41102
+        },
+        "teardownGasLimits": {
+          "daGas": 0,
+          "l2Gas": 0
+        }
+      }
+    },
+    {
+      "name": "unknown_function_request_failed (FAILED)",
+      "totalGateCount": 0,
+      "gateCounts": [],
+      "gas": {
+        "gasLimits": {
+          "daGas": 0,
+          "l2Gas": 0
+        },
+        "teardownGasLimits": {
+          "daGas": 0,
+          "l2Gas": 0
+        }
+      }
+    }
+  ],
+  "gasSummary": {
+    "increment": 42792,
+    "unknown_function_request_failed (FAILED)": 0
+  }
+}
