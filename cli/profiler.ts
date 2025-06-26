@@ -166,12 +166,7 @@ export class Profiler {
       return result;
     } catch (error: any) {
       console.error(`Error profiling ${name}:`, error.message);
-      return {
-        name: `${name} (FAILED)`,
-        totalGateCount: 0,
-        gateCounts: [],
-        gas: { gasLimits: {daGas: 0, l2Gas: 0}, teardownGasLimits: {daGas: 0, l2Gas: 0} },
-      };
+      throw error;
     }
   }
 } 
