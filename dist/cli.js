@@ -76,14 +76,14 @@ program
         console.log(` -> Output report: ${outputJsonPath}`);
         if (!fs.existsSync(benchmarkFilePath)) {
             console.error(`Error: Benchmark file not found: ${benchmarkFilePath}`);
-            continue;
+            process.exit(1);
         }
         try {
             const module = await import(benchmarkFilePath);
             const BenchmarkClass = module.default;
             if (!BenchmarkClass || !(typeof BenchmarkClass === 'function') || !(typeof BenchmarkClass.prototype.getMethods === 'function')) {
                 console.error(`Error: ${benchmarkFilePath} does not export a default class with a getMethods method.`);
-                continue;
+                process.exit(1);
             }
             const benchmarkInstance = new BenchmarkClass();
             let runContext = {};
@@ -112,8 +112,9 @@ program
         }
         catch (error) {
             console.error(`Failed to run benchmark for ${contractName} from ${benchmarkFilePath}:`, error);
+            process.exit(1);
         }
     }
-    console.log('All specified benchmarks completed.');
+    console.log('All specified benchmarks completed successfully.');
 });
 program.parse(process.argv);
