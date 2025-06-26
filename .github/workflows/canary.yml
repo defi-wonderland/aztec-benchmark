@@ -6,7 +6,7 @@ on: workflow_dispatch
 jobs:
   publish-canary:
     runs-on: ubuntu-latest
-    environment: prod
+    environment: Development
 
     steps:
       - name: Checkout repository
