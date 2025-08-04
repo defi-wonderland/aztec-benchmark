@@ -76,10 +76,11 @@ const getStatusEmoji = (metrics, threshold) => {
 
 /**
  * Finds pairs of benchmark report files (base and PR/latest) in a directory.
+ * Now includes new contracts that only have PR reports (no corresponding base report).
  * @param {string} reportsDir - The directory containing benchmark reports.
  * @param {string} baseSuffix - The suffix for base report filenames (e.g., '_base').
  * @param {string} prSuffix - The suffix for PR/latest report filenames (e.g., '_latest').
- * @returns {Array<object>} An array of pairs, each with contractName, baseJsonPath, and prJsonPath.
+ * @returns {Array<object>} An array of pairs, each with contractName, baseJsonPath (or null), and prJsonPath.
  */
 function findBenchmarkPairs(reportsDir, baseSuffix, prSuffix) {
   const pairs = [];
@@ -97,14 +98,12 @@ function findBenchmarkPairs(reportsDir, baseSuffix, prSuffix) {
         const baseJsonPath = path.join(reportsDir, baseFilename);
         const prJsonPath = path.join(reportsDir, file);
 
-        // Check if the corresponding baseline file exists
-        if (fs.existsSync(baseJsonPath)) {
-          pairs.push({
-            contractName,
-            baseJsonPath,
-            prJsonPath
-          });
-        }
+        // Include all PR reports, whether or not they have a corresponding base report
+        pairs.push({
+          contractName,
+          baseJsonPath: fs.existsSync(baseJsonPath) ? baseJsonPath : null,
+          prJsonPath
+        });
       }
     }
   } catch (error) {
@@ -120,22 +119,39 @@ function findBenchmarkPairs(reportsDir, baseSuffix, prSuffix) {
 
 /**
  * Generates an HTML table comparing benchmark results for a single contract.
- * @param {object} pair - An object containing contractName, baseJsonPath, and prJsonPath.
+ * Handles new contracts where baseJsonPath may be null (no base report exists).
+ * @param {object} pair - An object containing contractName, baseJsonPath (or null), and prJsonPath.
  * @param {number} threshold - The percentage threshold for highlighting regressions.
  * @returns {string} An HTML string representing the comparison table, or an error message.
  */
 function generateContractComparisonTable(pair, threshold) {
   const { contractName, baseJsonPath, prJsonPath } = pair;
-  console.log(` Comparing: ${baseJsonPath} vs ${prJsonPath}`);
+  const isNewContract = baseJsonPath === null;
+  
+  if (isNewContract) {
+    console.log(` Generating report for new contract: ${contractName} in ${prJsonPath}`);
+  } else {
+    console.log(` Comparing: ${baseJsonPath} vs ${prJsonPath}`);
+  }
 
-  // Existence already checked in findBenchmarkPairs, but double check
-  if (!fs.existsSync(baseJsonPath) || !fs.existsSync(prJsonPath)) {
-    return `*Error: One or both report files missing for ${contractName} (this should not happen)*`;
+  // Check that PR report exists
+  if (!fs.existsSync(prJsonPath)) {
+    return `*Error: PR report file missing for ${contractName}: ${prJsonPath}*`;
+  }
+
+  // Check that base report exists (if not a new contract)
+  if (!isNewContract && !fs.existsSync(baseJsonPath)) {
+    return `*Error: Base report file missing for ${contractName}: ${baseJsonPath}*`;
   }
 
   let mainData, prData;
   try {
-     mainData = JSON.parse(fs.readFileSync(baseJsonPath, 'utf-8'));
+     // For new contracts, use empty data structure for base
+     if (isNewContract) {
+       mainData = { results: [] };
+     } else {
+       mainData = JSON.parse(fs.readFileSync(baseJsonPath, 'utf-8'));
+     }
      prData = JSON.parse(fs.readFileSync(prJsonPath, 'utf-8'));
   } catch(e) {
      return `*Error parsing benchmark JSON for ${contractName}: ${e.message}*`;
