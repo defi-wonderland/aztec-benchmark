@@ -140,6 +140,8 @@ export class Profiler {
     console.log(`Profiling ${name}...`);
 
     try {
+      // TODO: This is required as we need the sender to call estimate gas and there is
+      // no other way to get the sender without creating a tx request
       const txRequest = await f.create();
       const origin = txRequest.origin;
 

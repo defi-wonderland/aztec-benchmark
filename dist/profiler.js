@@ -128,11 +128,13 @@ async function _Profiler_profileOne(f, customName) {
     }
     console.log(`Profiling ${name}...`);
     try {
+        // TODO: This is required as we need the sender to call estimate gas and there is
+        // no other way to get the sender without creating a tx request
         const txRequest = await f.create();
         const origin = txRequest.origin;
-        const gas = await f.estimateGas();
+        const gas = await f.estimateGas({ from: origin });
         const profileResults = await f.profile({ profileMode: 'full', from: origin });
-        await f.send().wait();
+        await f.send({ from: origin }).wait();
         const result = {
             name,
             totalGateCount: sumArray(profileResults.executionSteps
