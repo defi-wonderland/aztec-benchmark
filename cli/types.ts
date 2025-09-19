@@ -1,5 +1,6 @@
 import type {
   ContractFunctionInteraction,
+  Wallet,
 } from '@aztec/aztec.js';
 
 /** Simplified Gas type (contains actual gas values) */
@@ -40,13 +41,22 @@ export interface ProfileResult {
   gas: GasLimits;
 }
 
-/** Defines a contract interaction to be benchmarked, with a custom display name. */
-export interface NamedBenchmarkedInteraction {
+/** Defines a contract interaction to be benchmarked along with the wallet executing it. */
+export interface BenchmarkedInteraction {
   /** The contract function interaction from Aztec.js. */
   interaction: ContractFunctionInteraction;
+  /** Wallet responsible for sending the interaction. */
+  wallet: Wallet;
+}
+
+/** Defines a contract interaction to be benchmarked, with a custom display name. */
+export interface NamedBenchmarkedInteraction extends BenchmarkedInteraction {
   /** The custom name to be used for this benchmark in reports. */
   name: string;
 }
+
+/** Union of supported benchmark definitions. */
+export type BenchmarkTarget = BenchmarkedInteraction | NamedBenchmarkedInteraction;
 
 /** Structure of the output JSON report */
 export interface ProfileReport {
@@ -63,7 +73,7 @@ export abstract class BenchmarkBase {
   /** Optional setup function run before benchmarks */
   abstract setup?(): Promise<BenchmarkContext>;
   /** Function returning the methods to benchmark. Can be a mix of plain interactions or named interactions. */
-  abstract getMethods(context: BenchmarkContext): Array<ContractFunctionInteraction | NamedBenchmarkedInteraction>;
+  abstract getMethods(context: BenchmarkContext): BenchmarkTarget[];
   /** Optional teardown function run after benchmarks (no longer abstract) */
   teardown?(context: BenchmarkContext): Promise<void>;
 } 

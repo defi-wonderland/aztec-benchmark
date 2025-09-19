@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import toml from '@iarna/toml';
 import { Profiler } from './profiler.js';
-import { BenchmarkBase, BenchmarkContext, type ProfileResult, type NamedBenchmarkedInteraction } from './types.js';
+import { BenchmarkBase, BenchmarkContext, type ProfileResult, type BenchmarkTarget } from './types.js';
 import type { ContractFunctionInteraction } from '@aztec/aztec.js';
 
 /**
@@ -127,7 +127,7 @@ program
         }
 
         console.log(`Getting methods to benchmark for ${contractName}...`);
-        const interactionsToBenchmark: Array<ContractFunctionInteraction | NamedBenchmarkedInteraction> = benchmarkInstance.getMethods(runContext);
+        const interactionsToBenchmark: BenchmarkTarget[] = benchmarkInstance.getMethods(runContext);
 
         if (!Array.isArray(interactionsToBenchmark) || interactionsToBenchmark.length === 0) {
           console.warn(`No benchmark methods returned by getMethods for ${contractName}. Saving empty report.`);

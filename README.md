@@ -80,15 +80,15 @@ npx aztec-benchmark --contracts token another_contract --output-dir ./benchmark_
 ## Writing Benchmarks
 
 Benchmarks are TypeScript classes extending `BenchmarkBase` from this package.
-Each entry in the array returned by `getMethods` can either be a plain `ContractFunctionInteraction` 
-(in which case the benchmark name is auto-derived) or a `NamedBenchmarkedInteraction` object 
-(which includes the `interaction` and a custom `name` for reporting).
+Each entry in the array returned by `getMethods` must provide both the `ContractFunctionInteraction` and the
+`Wallet` that will submit it. Use `BenchmarkedInteraction` for the minimal shape, or
+`NamedBenchmarkedInteraction` when you want to override the report label.
 
 ```ts
 import {
   Benchmark, // Alias for BenchmarkBase
-  type BenchmarkContext, 
-  type NamedBenchmarkedInteraction 
+  type BenchmarkContext,
+  type BenchmarkTarget,
 } from '@defi-wonderland/aztec-benchmark';
 import {
   type AccountWallet,
@@ -122,8 +122,8 @@ export default class MyContractBenchmark extends Benchmark {
     return { pxe, deployer, contract }; 
   }
 
-  // Returns an array of interactions to benchmark. 
-  async getMethods(context: MyBenchmarkContext): Promise<Array<ContractFunctionInteraction | NamedBenchmarkedInteraction>> {
+  // Returns an array of interactions to benchmark.
+  getMethods(context: MyBenchmarkContext): BenchmarkTarget[] {
     // Ensure context is available (it should be if setup ran correctly)
     if (!context || !context.contract) {
       // In a real scenario, setup() must initialize the context properly.
@@ -142,11 +142,11 @@ export default class MyContractBenchmark extends Benchmark {
 
     return [
       // Example of a plain interaction - name will be auto-derived
-      interactionPlain,
+      { interaction: interactionPlain, wallet: deployer },
       // Example of a named interaction
-      { interaction: interactionNamed1, name: "Some Other Method (value 1)" }, 
+      { interaction: interactionNamed1, wallet: deployer, name: "Some Other Method (value 1)" },
       // Another named interaction
-      { interaction: interactionNamed2, name: "Some Other Method (value 2)" }, 
+      { interaction: interactionNamed2, wallet: deployer, name: "Some Other Method (value 2)" },
     ];
   }
 
@@ -161,9 +161,10 @@ export default class MyContractBenchmark extends Benchmark {
 ```
 
 **Note:** Your benchmark code needs a valid Aztec project setup to interact with contracts.
-Your `BenchmarkBase` implementation is responsible for constructing the `ContractFunctionInteraction` objects.
-If you provide a `NamedBenchmarkedInteraction` object, its `name` field will be used in reports. 
-If you provide a plain `ContractFunctionInteraction`, the tool will attempt to derive a name from the interaction (e.g., the method name).
+Your `BenchmarkBase` implementation is responsible for constructing the `ContractFunctionInteraction` objects and
+supplying the wallet that should execute them. If you provide a `NamedBenchmarkedInteraction` object, its `name`
+field will be used in reports; otherwise the tool derives a name from the interaction (for example, using the method
+selector).
 
 ### Wonderland's Usage Example
 

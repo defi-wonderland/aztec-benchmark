@@ -37,14 +37,8 @@ export class Profiler {
     async profile(fsToProfile) {
         const results = [];
         for (const item of fsToProfile) {
-            if ('interaction' in item && 'name' in item) {
-                // This is a NamedBenchmarkedInteraction object
-                results.push(await __classPrivateFieldGet(this, _Profiler_instances, "m", _Profiler_profileOne).call(this, item.interaction, item.name));
-            }
-            else {
-                // This is a plain ContractFunctionInteraction
-                results.push(await __classPrivateFieldGet(this, _Profiler_instances, "m", _Profiler_profileOne).call(this, item)); // Pass undefined for customName
-            }
+            const name = 'name' in item ? item.name : undefined;
+            results.push(await __classPrivateFieldGet(this, _Profiler_instances, "m", _Profiler_profileOne).call(this, item.interaction, item.wallet, name));
         }
         return results;
     }
@@ -94,7 +88,7 @@ _Profiler_instances = new WeakSet(), _Profiler_profileOne =
  *          Returns a result with FAILED in the name and zero counts/gas if profiling errors.
  * @private
  */
-async function _Profiler_profileOne(f, customName) {
+async function _Profiler_profileOne(f, wallet, customName) {
     let name;
     if (customName) {
         name = customName;
@@ -127,10 +121,18 @@ async function _Profiler_profileOne(f, customName) {
         }
     }
     console.log(`Profiling ${name}...`);
+    let callOptions;
     try {
-        const gas = await f.estimateGas();
-        const profileResults = await f.profile({ profileMode: 'full' });
-        await f.send().wait();
+        callOptions = { from: wallet.getAddress() };
+    }
+    catch (error) {
+        console.error(`Unable to obtain wallet address for ${name}:`, error.message);
+        throw error;
+    }
+    try {
+        const gas = await f.estimateGas(callOptions);
+        const profileResults = await f.profile({ ...callOptions, profileMode: 'full' });
+        await f.send(callOptions).wait();
         const result = {
             name,
             totalGateCount: sumArray(profileResults.executionSteps

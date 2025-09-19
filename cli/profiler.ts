@@ -1,5 +1,6 @@
 import {
   type ContractFunctionInteraction,
+  type Wallet,
 } from '@aztec/aztec.js';
 import fs from 'node:fs';
 import {
@@ -8,7 +9,7 @@ import {
   type ProfileReport,
   type Gas,
   type GasLimits,
-  type NamedBenchmarkedInteraction,
+  type BenchmarkTarget,
 } from './types.js';
 
 /**
@@ -39,16 +40,11 @@ export class Profiler {
    * @param fsToProfile - An array of items to profile.
    * @returns A promise that resolves to an array of profile results.
    */
-  async profile(fsToProfile: Array<ContractFunctionInteraction | NamedBenchmarkedInteraction>): Promise<ProfileResult[]> {
+  async profile(fsToProfile: BenchmarkTarget[]): Promise<ProfileResult[]> {
     const results: ProfileResult[] = [];
     for (const item of fsToProfile) {
-      if ('interaction' in item && 'name' in item) {
-        // This is a NamedBenchmarkedInteraction object
-        results.push(await this.#profileOne(item.interaction, item.name));
-      } else {
-        // This is a plain ContractFunctionInteraction
-        results.push(await this.#profileOne(item as ContractFunctionInteraction)); // Pass undefined for customName
-      }
+      const name = 'name' in item ? item.name : undefined;
+      results.push(await this.#profileOne(item.interaction, item.wallet, name));
     }
     return results;
   }
@@ -110,7 +106,11 @@ export class Profiler {
    *          Returns a result with FAILED in the name and zero counts/gas if profiling errors.
    * @private
    */
-  async #profileOne(f: ContractFunctionInteraction, customName?: string): Promise<ProfileResult> {
+  async #profileOne(
+    f: ContractFunctionInteraction,
+    wallet: Wallet,
+    customName?: string,
+  ): Promise<ProfileResult> {
     let name: string;
     if (customName) {
       name = customName;
@@ -141,10 +141,18 @@ export class Profiler {
 
     console.log(`Profiling ${name}...`);
 
+    let callOptions;
     try {
-      const gas: GasLimits = await f.estimateGas();
-      const profileResults = await f.profile({ profileMode: 'full' });
-      await f.send().wait();
+      callOptions = { from: wallet.getAddress() };
+    } catch (error: any) {
+      console.error(`Unable to obtain wallet address for ${name}:`, error.message);
+      throw error;
+    }
+
+    try {
+      const gas: GasLimits = await f.estimateGas(callOptions);
+      const profileResults = await f.profile({ ...callOptions, profileMode: 'full' });
+      await f.send(callOptions).wait();
 
       const result: ProfileResult = {
         name,
