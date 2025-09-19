@@ -1,6 +1,4 @@
-import {
-  type ContractFunctionInteraction,
-} from '@aztec/aztec.js';
+import { type ContractFunctionInteraction } from '@aztec/aztec.js';
 import fs from 'node:fs';
 import {
   type ProfileResult,
@@ -142,9 +140,12 @@ export class Profiler {
     console.log(`Profiling ${name}...`);
 
     try {
-      const gas: GasLimits = await f.estimateGas();
-      const profileResults = await f.profile({ profileMode: 'full' });
-      await f.send().wait();
+      const txRequest = await f.create();
+      const origin = txRequest.origin;
+
+      const gas: GasLimits = await f.estimateGas({ from: origin });
+      const profileResults = await f.profile({ profileMode: 'full', from: origin });
+      await f.send({ from: origin }).wait();
 
       const result: ProfileResult = {
         name,

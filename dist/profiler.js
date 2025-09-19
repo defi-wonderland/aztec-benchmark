@@ -128,9 +128,11 @@ async function _Profiler_profileOne(f, customName) {
     }
     console.log(`Profiling ${name}...`);
     try {
-        const gas = await f.estimateGas();
-        const profileResults = await f.profile({ profileMode: 'full' });
-        await f.send().wait();
+        const txRequest = await f.create();
+        const origin = txRequest.origin;
+        const gas = await f.estimateGas({ from: origin });
+        const profileResults = await f.profile({ profileMode: 'full', from: origin });
+        await f.send({ from: origin }).wait();
         const result = {
             name,
             totalGateCount: sumArray(profileResults.executionSteps
