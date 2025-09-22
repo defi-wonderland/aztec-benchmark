@@ -115,7 +115,10 @@ export default class MyContractBenchmark extends Benchmark {
     const [deployer] = await getInitialTestAccountsWallets(pxe);
     
     //  Deploy your contract (replace YourSpecificContract with your actual contract class)
-    const deployedContract = await YourSpecificContract.deploy(deployer, /* constructor args */).send().deployed();
+    const deployedContract = await YourSpecificContract
+      .deploy(deployer, /* constructor args */)
+      .send({ from: deployer.getAddress() })
+      .deployed();
     const contract = await YourSpecificContract.at(deployedContract.address, deployer);
     console.log('Contract deployed at:', contract.address.toString());
 
