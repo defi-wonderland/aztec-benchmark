@@ -26,6 +26,10 @@ inputs:
     description: 'Directory where benchmark JSON reports are stored and will be generated.'
     required: false
     default: './benchmarks'
+  only_report:
+    description: 'If true, skips executing the aztec-benchmark CLI and just runs the comparison.'
+    required: false
+    default: 'false'
 outputs:
   comparison_markdown:
     description: "The generated comparison report in Markdown format."
