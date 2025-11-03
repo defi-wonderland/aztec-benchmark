@@ -1,4 +1,4 @@
-import { type ContractFunctionInteraction } from '@aztec/aztec.js';
+import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
 import fs from 'node:fs';
 import {
   type ProfileResult,
@@ -37,15 +37,15 @@ export class Profiler {
    * @param fsToProfile - An array of items to profile.
    * @returns A promise that resolves to an array of profile results.
    */
-  async profile(fsToProfile: Array<ContractFunctionInteraction | NamedBenchmarkedInteraction>): Promise<ProfileResult[]> {
+  async profile(fsToProfile: Array<ContractFunctionInteractionCallIntent | NamedBenchmarkedInteraction>): Promise<ProfileResult[]> {
     const results: ProfileResult[] = [];
     for (const item of fsToProfile) {
       if ('interaction' in item && 'name' in item) {
         // This is a NamedBenchmarkedInteraction object
         results.push(await this.#profileOne(item.interaction, item.name));
       } else {
-        // This is a plain ContractFunctionInteraction
-        results.push(await this.#profileOne(item as ContractFunctionInteraction)); // Pass undefined for customName
+        // This is a plain ContractFunctionInteractionCallIntent
+        results.push(await this.#profileOne(item as ContractFunctionInteractionCallIntent)); // Pass undefined for customName
       }
     }
     return results;
@@ -108,14 +108,14 @@ export class Profiler {
    *          Returns a result with FAILED in the name and zero counts/gas if profiling errors.
    * @private
    */
-  async #profileOne(f: ContractFunctionInteraction, customName?: string): Promise<ProfileResult> {
+  async #profileOne(f: ContractFunctionInteractionCallIntent, customName?: string): Promise<ProfileResult> {
     let name: string;
     if (customName) {
       name = customName;
     } else {
       // Name discovery logic (reinstated)
       try {
-        const executionPayload = await f.request(); // Note: f.request() might be an issue if f is already a PxeSimoneResponse - check aztec.js docs
+        const executionPayload = await f.action.request(); // Note: f.request() might be an issue if f is already a PxeSimoneResponse - check aztec.js docs
         if (executionPayload.calls && executionPayload.calls.length > 0) {
           const firstCall = executionPayload.calls[0];
           // Attempt to get a meaningful name
@@ -140,14 +140,12 @@ export class Profiler {
     console.log(`Profiling ${name}...`);
 
     try {
-      // TODO: This is required as we need the sender to call estimate gas and there is
-      // no other way to get the sender without creating a tx request
-      const txRequest = await f.create();
-      const origin = txRequest.origin;
+      // Now we use the caller from the interaction
+      const origin = f.caller;
 
-      const gas: GasLimits = await f.estimateGas({ from: origin });
-      const profileResults = await f.profile({ profileMode: 'full', from: origin });
-      await f.send({ from: origin }).wait();
+      const gas: GasLimits = (await f.action.simulate({ from: origin, fee: { estimateGas: true } })).estimatedGas;
+      const profileResults = await f.action.profile({ profileMode: 'full', from: origin });
+      await f.action.send({ from: origin }).wait();
 
       const result: ProfileResult = {
         name,
