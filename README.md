@@ -91,14 +91,13 @@ import {
   type NamedBenchmarkedInteraction
 } from '@defi-wonderland/aztec-benchmark';
 import type { PXE } from '@aztec/pxe/server';
-import { createStore } from '@aztec/kv-store/lmdb-v2';
 import type { Contract } from '@aztec/aztec.js/contracts'; // Generic Contract type from Aztec.js
-import { createPXE, getPXEConfig } from '@aztec/pxe/server';
 import type { AztecAddress } from '@aztec/aztec.js/addresses';
-import { createAztecNodeClient, waitForNode } from '@aztec/aztec.js/node';
 import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
+import { createStore } from '@aztec/kv-store/lmdb-v2';
+import { createPXE, getPXEConfig } from '@aztec/pxe/server';
+import { createAztecNodeClient, waitForNode } from '@aztec/aztec.js/node';
 import { registerInitialSandboxAccountsInWallet, type TestWallet } from '@aztec/test-wallet/server';
-
 // import { YourSpecificContract } from '../artifacts/YourSpecificContract.js'; // Replace with your actual contract artifact
 
 // 1. Define a specific context for your benchmark (optional but good practice)
