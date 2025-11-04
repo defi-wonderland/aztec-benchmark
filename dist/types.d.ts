@@ -1,4 +1,4 @@
-import type { ContractFunctionInteraction } from '@aztec/aztec.js';
+import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
 /** Simplified Gas type (contains actual gas values) */
 export type Gas = {
     /** Data Availability gas */
@@ -35,7 +35,7 @@ export interface ProfileResult {
 /** Defines a contract interaction to be benchmarked, with a custom display name. */
 export interface NamedBenchmarkedInteraction {
     /** The contract function interaction from Aztec.js. */
-    interaction: ContractFunctionInteraction;
+    interaction: ContractFunctionInteractionCallIntent;
     /** The custom name to be used for this benchmark in reports. */
     name: string;
 }
@@ -53,7 +53,7 @@ export declare abstract class BenchmarkBase {
     /** Optional setup function run before benchmarks */
     abstract setup?(): Promise<BenchmarkContext>;
     /** Function returning the methods to benchmark. Can be a mix of plain interactions or named interactions. */
-    abstract getMethods(context: BenchmarkContext): Array<ContractFunctionInteraction | NamedBenchmarkedInteraction>;
+    abstract getMethods(context: BenchmarkContext): Array<ContractFunctionInteractionCallIntent | NamedBenchmarkedInteraction>;
     /** Optional teardown function run after benchmarks (no longer abstract) */
     teardown?(context: BenchmarkContext): Promise<void>;
 }
