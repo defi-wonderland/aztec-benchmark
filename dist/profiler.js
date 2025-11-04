@@ -42,7 +42,7 @@ export class Profiler {
                 results.push(await __classPrivateFieldGet(this, _Profiler_instances, "m", _Profiler_profileOne).call(this, item.interaction, item.name));
             }
             else {
-                // This is a plain ContractFunctionInteraction
+                // This is a plain ContractFunctionInteractionCallIntent
                 results.push(await __classPrivateFieldGet(this, _Profiler_instances, "m", _Profiler_profileOne).call(this, item)); // Pass undefined for customName
             }
         }
@@ -102,7 +102,7 @@ async function _Profiler_profileOne(f, customName) {
     else {
         // Name discovery logic (reinstated)
         try {
-            const executionPayload = await f.request(); // Note: f.request() might be an issue if f is already a PxeSimoneResponse - check aztec.js docs
+            const executionPayload = await f.action.request(); // Note: f.request() might be an issue if f is already a PxeSimoneResponse - check aztec.js docs
             if (executionPayload.calls && executionPayload.calls.length > 0) {
                 const firstCall = executionPayload.calls[0];
                 // Attempt to get a meaningful name
@@ -128,13 +128,11 @@ async function _Profiler_profileOne(f, customName) {
     }
     console.log(`Profiling ${name}...`);
     try {
-        // TODO: This is required as we need the sender to call estimate gas and there is
-        // no other way to get the sender without creating a tx request
-        const txRequest = await f.create();
-        const origin = txRequest.origin;
-        const gas = await f.estimateGas({ from: origin });
-        const profileResults = await f.profile({ profileMode: 'full', from: origin });
-        await f.send({ from: origin }).wait();
+        // Now we use the caller from the interaction
+        const origin = f.caller;
+        const gas = (await f.action.simulate({ from: origin, fee: { estimateGas: true } })).estimatedGas;
+        const profileResults = await f.action.profile({ profileMode: 'full', from: origin });
+        await f.action.send({ from: origin }).wait();
         const result = {
             name,
             totalGateCount: sumArray(profileResults.executionSteps
