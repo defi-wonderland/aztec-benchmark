@@ -144,7 +144,7 @@ export class Profiler {
       const origin = f.caller;
 
       const gas: GasLimits = (await f.action.simulate({ from: origin, fee: { estimateGas: true } })).estimatedGas;
-      const profileResults = await f.action.profile({ profileMode: 'full', from: origin });
+      const profileResults = await f.action.profile({ profileMode: 'full', from: origin, skipProofGeneration: false });
       await f.action.send({ from: origin }).wait();
 
       const result: ProfileResult = {
@@ -159,11 +159,13 @@ export class Profiler {
           gateCount: step.gateCount || 0,
         })),
         gas,
+        provingTime: profileResults.stats?.timings?.proving,
       };
 
       const daGas = gas?.gasLimits?.daGas ?? 'N/A';
       const l2Gas = gas?.gasLimits?.l2Gas ?? 'N/A';
-      console.log(` -> ${name}: ${result.totalGateCount} gates, Gas (DA: ${daGas}, L2: ${l2Gas})`);
+      const provingTime = result.provingTime ?? 'N/A';
+      console.log(` -> ${name}: ${result.totalGateCount} gates, Gas (DA: ${daGas}, L2: ${l2Gas}), Proving: ${provingTime}ms`);
       return result;
     } catch (error: any) {
       console.error(`Error profiling ${name}:`, error.message);

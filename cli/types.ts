@@ -36,6 +36,8 @@ export interface ProfileResult {
   gateCounts: GateCount[];
   /** Gas usage information for the function. */
   gas: GasLimits;
+  /** Proving time in milliseconds. */
+  provingTime?: number;
 }
 
 /** Defines a contract interaction to be benchmarked, with a custom display name. */
