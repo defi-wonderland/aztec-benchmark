@@ -1,4 +1,5 @@
 import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
+import { TestWallet } from '@aztec/test-wallet/server';
 
 /** Simplified Gas type (contains actual gas values) */
 export type Gas = {
@@ -15,8 +16,9 @@ export type GasLimits = {
 };
 
 /** Benchmark specific setup/teardown context */
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface BenchmarkContext {}
+export interface BenchmarkContext {
+  wallet?: TestWallet;
+}
 
 /** Gate counts for a specific circuit */
 export interface GateCount {
@@ -56,6 +58,8 @@ export interface ProfileReport {
   results: ProfileResult[];
   /** Gas summary (total L2 + DA) keyed by function name */
   gasSummary: Record<string, number>;
+  /** Proving time summary (in ms) keyed by function name */
+  provingTimeSummary: Record<string, number>;
 }
 
 /** Abstract class for users to extend */
