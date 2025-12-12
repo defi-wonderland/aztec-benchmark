@@ -1,4 +1,5 @@
 import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
+import { TestWallet } from '@aztec/test-wallet/server';
 /** Simplified Gas type (contains actual gas values) */
 export type Gas = {
     /** Data Availability gas */
@@ -13,6 +14,7 @@ export type GasLimits = {
 };
 /** Benchmark specific setup/teardown context */
 export interface BenchmarkContext {
+    wallet?: TestWallet;
 }
 /** Gate counts for a specific circuit */
 export interface GateCount {
@@ -49,6 +51,8 @@ export interface ProfileReport {
     results: ProfileResult[];
     /** Gas summary (total L2 + DA) keyed by function name */
     gasSummary: Record<string, number>;
+    /** Proving time summary (in ms) keyed by function name */
+    provingTimeSummary: Record<string, number>;
 }
 /** Abstract class for users to extend */
 export declare abstract class BenchmarkBase {
