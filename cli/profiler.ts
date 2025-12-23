@@ -1,8 +1,11 @@
 import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
+import { proveInteraction } from '@aztec/test-wallet/server';
+import { TestWallet } from '@aztec/test-wallet/server';
+
+
 import fs from 'node:fs';
 import {
   type ProfileResult,
-  type GateCount,
   type ProfileReport,
   type Gas,
   type GasLimits,
@@ -27,10 +30,26 @@ function sumGas(gas: Gas): number {
   return (gas?.daGas ?? 0) + (gas?.l2Gas ?? 0);
 }
 
+interface ProfilerOptions {
+  skipProving?: boolean;
+}
+
 /**
- * Profiles Aztec contract functions to measure gate counts and gas usage.
+ * Profiles Aztec contract functions to measure gate counts, gas usage and proving time.
  */
 export class Profiler {
+  #wallet?: TestWallet;
+  #skipProving: boolean;
+
+  constructor(wallet?: TestWallet, options?: ProfilerOptions) {
+    this.#wallet = wallet;
+    this.#skipProving = options?.skipProving ?? false;
+    
+    if (!this.#skipProving && !wallet) {
+      throw new Error('Wallet is required when proving is enabled');
+    }
+  }
+
   /**
    * Profiles a list of contract function interactions. 
    * Items can be plain interactions or objects with an interaction and a custom name.
@@ -62,7 +81,7 @@ export class Profiler {
       console.log(`No results to save for ${filename}. Saving empty report.`);
       fs.writeFileSync(
         filename,
-        JSON.stringify({ summary: {}, results: [], gasSummary: {} } as ProfileReport, null, 2),
+        JSON.stringify({ summary: {}, gasSummary: {}, provingTimeSummary: {}, results: [] } as ProfileReport, null, 2),
       );
       return;
     }
@@ -85,10 +104,19 @@ export class Profiler {
       {} as Record<string, number>,
     );
 
+    const provingTimeSummary = results.reduce(
+      (acc, result) => ({
+        ...acc,
+        [result.name]: result.provingTime ?? 0,
+      }),
+      {} as Record<string, number>,
+    );
+
     const report: ProfileReport = {
       summary,
-      results: results,
       gasSummary,
+      provingTimeSummary,
+      results: results,
     };
 
     console.log(`Saving results for ${results.length} methods in ${filename}`);
@@ -140,12 +168,25 @@ export class Profiler {
     console.log(`Profiling ${name}...`);
 
     try {
-      // Now we use the caller from the interaction
       const origin = f.caller;
 
-      const gas: GasLimits = (await f.action.simulate({ from: origin, fee: { estimateGas: true } })).estimatedGas;
-      const profileResults = await f.action.profile({ profileMode: 'full', from: origin });
-      await f.action.send({ from: origin }).wait();
+      // Gas simulated is 10% higher by default, we set the padding to 0 to get a better estimate.
+      const gas: GasLimits = (await f.action.simulate({ from: origin, fee: { estimateGas: true, estimatedGasPadding: 0 } })).estimatedGas;
+      // We cannot send a profiled tx proof, so we skip proof generation. We still need to profile gate counts.
+      const profileResults = await f.action.profile({ profileMode: 'full', from: origin, skipProofGeneration: true });
+
+      let provingTime: number | undefined;
+
+      if (!this.#skipProving && this.#wallet) {
+        // We prove the tx to get the proving time.
+        const provenTx = await proveInteraction(this.#wallet, f.action, { from: f.caller });
+        // We send the tx. We could get the gas used from the receipt.
+        await provenTx.send().wait();
+        provingTime = provenTx.stats?.timings?.proving;
+      } else {
+        // We send the tx. We could get the gas used from the receipt.
+        await f.action.send({ from: origin }).wait();
+      }
 
       const result: ProfileResult = {
         name,
@@ -159,11 +200,13 @@ export class Profiler {
           gateCount: step.gateCount || 0,
         })),
         gas,
+        provingTime,
       };
 
       const daGas = gas?.gasLimits?.daGas ?? 'N/A';
       const l2Gas = gas?.gasLimits?.l2Gas ?? 'N/A';
-      console.log(` -> ${name}: ${result.totalGateCount} gates, Gas (DA: ${daGas}, L2: ${l2Gas})`);
+      const provingDisplay = provingTime !== undefined ? `${provingTime}ms` : 'skipped';
+      console.log(` -> ${name}: ${result.totalGateCount} gates, Gas (DA: ${daGas}, L2: ${l2Gas}), Proving: ${provingDisplay}`);
       return result;
     } catch (error: any) {
       console.error(`Error profiling ${name}:`, error.message);

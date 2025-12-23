@@ -13,6 +13,12 @@ const getDaGas = (result) => result?.gas?.gasLimits?.daGas ?? 0;
  * @returns {number} The L2 gas value, or 0 if not found.
  */
 const getL2Gas = (result) => result?.gas?.gasLimits?.l2Gas ?? 0;
+/**
+ * Extracts proving time from a benchmark result.
+ * @param {object} result - The benchmark result object.
+ * @returns {number} The proving time in milliseconds, or 0 if not found.
+ */
+const getProvingTime = (result) => result?.provingTime ?? 0;
 
 /**
  * Formats the difference between two numbers as a string, including percentage change.
@@ -179,6 +185,7 @@ function generateContractComparisonTable(pair, threshold) {
       gates: { main: mainResult?.totalGateCount ?? 0, pr: prResult?.totalGateCount ?? 0 },
       daGas: { main: getDaGas(mainResult), pr: getDaGas(prResult) },
       l2Gas: { main: getL2Gas(mainResult), pr: getL2Gas(prResult) },
+      provingTime: { main: getProvingTime(mainResult), pr: getProvingTime(prResult) },
     };
   }
 
@@ -191,10 +198,14 @@ function generateContractComparisonTable(pair, threshold) {
     '  <th colspan="3">Gates</th>',
     '  <th colspan="3">DA Gas</th>',
     '  <th colspan="3">L2 Gas</th>',
+    '  <th colspan="3">Proving Time</th>',
     '</tr>',
     '<tr>',
     '  <th>Status</th>',
     '  <th></th>',
+    '  <th>Base</th>',
+    '  <th>PR</th>',
+    '  <th>Diff</th>',
     '  <th>Base</th>',
     '  <th>PR</th>',
     '  <th>Diff</th>',
@@ -236,6 +247,10 @@ function generateContractComparisonTable(pair, threshold) {
       `  <td align="right">${metrics.l2Gas.main.toLocaleString()}</td>`,
       `  <td align="right">${metrics.l2Gas.pr.toLocaleString()}</td>`,
       `  <td align="right">${formatDiff(metrics.l2Gas.main, metrics.l2Gas.pr)}</td>`,
+      // Proving Time
+      `  <td align="right">${metrics.provingTime.main > 0 ? metrics.provingTime.main.toLocaleString() + 'ms' : 'N/A'}</td>`,
+      `  <td align="right">${metrics.provingTime.pr > 0 ? metrics.provingTime.pr.toLocaleString() + 'ms' : 'N/A'}</td>`,
+      `  <td align="right">${formatDiff(metrics.provingTime.main, metrics.provingTime.pr)}</td>`,
       '</tr>',
     );
   }
