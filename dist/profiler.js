@@ -29,7 +29,7 @@ function sumGas(gas) {
     return (gas?.daGas ?? 0) + (gas?.l2Gas ?? 0);
 }
 /**
- * Profiles Aztec contract functions to measure gate counts and proving time.
+ * Profiles Aztec contract functions to measure gate counts, gas usage and proving time.
  */
 export class Profiler {
     constructor(wallet, options) {
@@ -148,8 +148,8 @@ async function _Profiler_profileOne(f, customName) {
     console.log(`Profiling ${name}...`);
     try {
         const origin = f.caller;
-        // TODO: Gas simulated is 10% higher than actual gas used. Should we use the receipt instead?
-        const gas = (await f.action.simulate({ from: origin, fee: { estimateGas: true } })).estimatedGas;
+        // Gas simulated is 10% higher by default, we set the padding to 0 to get a better estimate.
+        const gas = (await f.action.simulate({ from: origin, fee: { estimateGas: true, estimatedGasPadding: 0 } })).estimatedGas;
         // We cannot send a profiled tx proof, so we skip proof generation. We still need to profile gate counts.
         const profileResults = await f.action.profile({ profileMode: 'full', from: origin, skipProofGeneration: true });
         let provingTime;

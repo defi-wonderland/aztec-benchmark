@@ -5,7 +5,7 @@ interface ProfilerOptions {
     skipProving?: boolean;
 }
 /**
- * Profiles Aztec contract functions to measure gate counts and proving time.
+ * Profiles Aztec contract functions to measure gate counts, gas usage and proving time.
  */
 export declare class Profiler {
     #private;
