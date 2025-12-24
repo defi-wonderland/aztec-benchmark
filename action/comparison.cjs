@@ -198,7 +198,7 @@ function generateContractComparisonTable(pair, threshold) {
     '  <th colspan="3">Gates</th>',
     '  <th colspan="3">DA Gas</th>',
     '  <th colspan="3">L2 Gas</th>',
-    '  <th colspan="3">Proving Time</th>',
+    '  <th colspan="3">Proving Time ms</th>',
     '</tr>',
     '<tr>',
     '  <th>Status</th>',
@@ -248,9 +248,9 @@ function generateContractComparisonTable(pair, threshold) {
       `  <td align="right">${metrics.l2Gas.pr.toLocaleString()}</td>`,
       `  <td align="right">${formatDiff(metrics.l2Gas.main, metrics.l2Gas.pr)}</td>`,
       // Proving Time
-      `  <td align="right">${metrics.provingTime.main > 0 ? metrics.provingTime.main.toLocaleString() + 'ms' : 'N/A'}</td>`,
-      `  <td align="right">${metrics.provingTime.pr > 0 ? metrics.provingTime.pr.toLocaleString() + 'ms' : 'N/A'}</td>`,
-      `  <td align="right">${formatDiff(metrics.provingTime.main, metrics.provingTime.pr)}</td>`,
+      `  <td align="right">${metrics.provingTime.main > 0 ? Math.round(metrics.provingTime.main).toLocaleString() : 'N/A'}</td>`,
+      `  <td align="right">${metrics.provingTime.pr > 0 ? Math.round(metrics.provingTime.pr).toLocaleString() : 'N/A'}</td>`,
+      `  <td align="right">${formatDiff(Math.round(metrics.provingTime.main), Math.round(metrics.provingTime.pr))}</td>`,
       '</tr>',
     );
   }
