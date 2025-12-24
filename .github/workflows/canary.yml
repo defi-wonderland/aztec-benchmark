@@ -1,12 +1,17 @@
 # .github/workflows/canary.yml
-name: Canary Release
+name: Canary Release (OIDC)
 
 on: workflow_dispatch
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   publish-canary:
+    if: github.event_name == 'workflow_call' || github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.release.draft == false)
     runs-on: ubuntu-latest
-    environment: Development
+    environment: Publisher
 
     steps:
       - name: Checkout repository
@@ -18,6 +23,9 @@ jobs:
           node-version: 22.17.0
           cache: "yarn"
           registry-url: "https://registry.npmjs.org/"
+
+      - name: Update npm (for OIDC support)
+        run: npm install -g npm@11.5.2
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
@@ -35,9 +43,7 @@ jobs:
           echo "name=$(jq -r .name package.json)" >> $GITHUB_OUTPUT
 
       - name: Publish Canary to npm
-        run: npm publish --tag canary
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --tag canary --access public
 
       - name: Output Canary Version Info
         run: echo "Published canary version ${{ steps.package-info.outputs.version }} of ${{ steps.package-info.outputs.name }} to npm." 
