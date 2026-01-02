@@ -1,0 +1,14 @@
+name: Publish Release
+
+on:
+    release:
+        types: [published]
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    id-token: write
+
+jobs:
+    publish-aztec-benchmark-package:
+        uses: ./.github/workflows/publish-aztec-benchmark-package.yml
