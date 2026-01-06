@@ -1,9 +1,16 @@
+var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (receiver, state, value, kind, f) {
+    if (kind === "m") throw new TypeError("Private method is not writable");
+    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a setter");
+    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot write private member to an object whose class did not declare it");
+    return (kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value)), value;
+};
 var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (receiver, state, kind, f) {
     if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _Profiler_instances, _Profiler_profileOne;
+var _Profiler_instances, _Profiler_wallet, _Profiler_skipProving, _Profiler_profileOne;
+import { proveInteraction } from '@aztec/test-wallet/server';
 import fs from 'node:fs';
 /**
  * Sums all numbers in an array.
@@ -22,11 +29,18 @@ function sumGas(gas) {
     return (gas?.daGas ?? 0) + (gas?.l2Gas ?? 0);
 }
 /**
- * Profiles Aztec contract functions to measure gate counts and gas usage.
+ * Profiles Aztec contract functions to measure gate counts, gas usage and proving time.
  */
 export class Profiler {
-    constructor() {
+    constructor(wallet, options) {
         _Profiler_instances.add(this);
+        _Profiler_wallet.set(this, void 0);
+        _Profiler_skipProving.set(this, void 0);
+        __classPrivateFieldSet(this, _Profiler_wallet, wallet, "f");
+        __classPrivateFieldSet(this, _Profiler_skipProving, options?.skipProving ?? false, "f");
+        if (!__classPrivateFieldGet(this, _Profiler_skipProving, "f") && !wallet) {
+            throw new Error('Wallet is required when proving is enabled');
+        }
     }
     /**
      * Profiles a list of contract function interactions.
@@ -42,7 +56,7 @@ export class Profiler {
                 results.push(await __classPrivateFieldGet(this, _Profiler_instances, "m", _Profiler_profileOne).call(this, item.interaction, item.name));
             }
             else {
-                // This is a plain ContractFunctionInteraction
+                // This is a plain ContractFunctionInteractionCallIntent
                 results.push(await __classPrivateFieldGet(this, _Profiler_instances, "m", _Profiler_profileOne).call(this, item)); // Pass undefined for customName
             }
         }
@@ -57,7 +71,7 @@ export class Profiler {
     async saveResults(results, filename) {
         if (!results.length) {
             console.log(`No results to save for ${filename}. Saving empty report.`);
-            fs.writeFileSync(filename, JSON.stringify({ summary: {}, results: [], gasSummary: {} }, null, 2));
+            fs.writeFileSync(filename, JSON.stringify({ summary: {}, gasSummary: {}, provingTimeSummary: {}, results: [] }, null, 2));
             return;
         }
         const summary = results.reduce((acc, result) => ({
@@ -70,10 +84,15 @@ export class Profiler {
                 ? sumGas(result.gas.gasLimits) + sumGas(result.gas.teardownGasLimits)
                 : 0,
         }), {});
+        const provingTimeSummary = results.reduce((acc, result) => ({
+            ...acc,
+            [result.name]: result.provingTime ?? 0,
+        }), {});
         const report = {
             summary,
-            results: results,
             gasSummary,
+            provingTimeSummary,
+            results: results,
         };
         console.log(`Saving results for ${results.length} methods in ${filename}`);
         try {
@@ -85,7 +104,7 @@ export class Profiler {
         }
     }
 }
-_Profiler_instances = new WeakSet(), _Profiler_profileOne = 
+_Profiler_wallet = new WeakMap(), _Profiler_skipProving = new WeakMap(), _Profiler_instances = new WeakSet(), _Profiler_profileOne = 
 /**
  * Profiles a single contract function interaction.
  * @param f - The contract function interaction to profile.
@@ -102,7 +121,7 @@ async function _Profiler_profileOne(f, customName) {
     else {
         // Name discovery logic (reinstated)
         try {
-            const executionPayload = await f.request(); // Note: f.request() might be an issue if f is already a PxeSimoneResponse - check aztec.js docs
+            const executionPayload = await f.action.request(); // Note: f.request() might be an issue if f is already a PxeSimoneResponse - check aztec.js docs
             if (executionPayload.calls && executionPayload.calls.length > 0) {
                 const firstCall = executionPayload.calls[0];
                 // Attempt to get a meaningful name
@@ -128,13 +147,23 @@ async function _Profiler_profileOne(f, customName) {
     }
     console.log(`Profiling ${name}...`);
     try {
-        // TODO: This is required as we need the sender to call estimate gas and there is
-        // no other way to get the sender without creating a tx request
-        const txRequest = await f.create();
-        const origin = txRequest.origin;
-        const gas = await f.estimateGas({ from: origin });
-        const profileResults = await f.profile({ profileMode: 'full', from: origin });
-        await f.send({ from: origin }).wait();
+        const origin = f.caller;
+        // Gas simulated is 10% higher by default, we set the padding to 0 to get a better estimate.
+        const gas = (await f.action.simulate({ from: origin, fee: { estimateGas: true, estimatedGasPadding: 0 } })).estimatedGas;
+        // We cannot send a profiled tx proof, so we skip proof generation. We still need to profile gate counts.
+        const profileResults = await f.action.profile({ profileMode: 'full', from: origin, skipProofGeneration: true });
+        let provingTime;
+        if (!__classPrivateFieldGet(this, _Profiler_skipProving, "f") && __classPrivateFieldGet(this, _Profiler_wallet, "f")) {
+            // We prove the tx to get the proving time.
+            const provenTx = await proveInteraction(__classPrivateFieldGet(this, _Profiler_wallet, "f"), f.action, { from: f.caller });
+            // We send the tx. We could get the gas used from the receipt.
+            await provenTx.send().wait();
+            provingTime = provenTx.stats?.timings?.proving;
+        }
+        else {
+            // We send the tx. We could get the gas used from the receipt.
+            await f.action.send({ from: origin }).wait();
+        }
         const result = {
             name,
             totalGateCount: sumArray(profileResults.executionSteps
@@ -145,10 +174,12 @@ async function _Profiler_profileOne(f, customName) {
                 gateCount: step.gateCount || 0,
             })),
             gas,
+            provingTime,
         };
         const daGas = gas?.gasLimits?.daGas ?? 'N/A';
         const l2Gas = gas?.gasLimits?.l2Gas ?? 'N/A';
-        console.log(` -> ${name}: ${result.totalGateCount} gates, Gas (DA: ${daGas}, L2: ${l2Gas})`);
+        const provingDisplay = provingTime !== undefined ? `${provingTime}ms` : 'skipped';
+        console.log(` -> ${name}: ${result.totalGateCount} gates, Gas (DA: ${daGas}, L2: ${l2Gas}), Proving: ${provingDisplay}`);
         return result;
     }
     catch (error) {

@@ -1,6 +1,5 @@
-import type {
-  ContractFunctionInteraction,
-} from '@aztec/aztec.js';
+import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
+import { TestWallet } from '@aztec/test-wallet/server';
 
 /** Simplified Gas type (contains actual gas values) */
 export type Gas = {
@@ -17,8 +16,9 @@ export type GasLimits = {
 };
 
 /** Benchmark specific setup/teardown context */
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface BenchmarkContext {}
+export interface BenchmarkContext {
+  wallet?: TestWallet;
+}
 
 /** Gate counts for a specific circuit */
 export interface GateCount {
@@ -38,12 +38,14 @@ export interface ProfileResult {
   gateCounts: GateCount[];
   /** Gas usage information for the function. */
   gas: GasLimits;
+  /** Proving time in milliseconds. */
+  provingTime?: number;
 }
 
 /** Defines a contract interaction to be benchmarked, with a custom display name. */
 export interface NamedBenchmarkedInteraction {
   /** The contract function interaction from Aztec.js. */
-  interaction: ContractFunctionInteraction;
+  interaction: ContractFunctionInteractionCallIntent;
   /** The custom name to be used for this benchmark in reports. */
   name: string;
 }
@@ -56,6 +58,8 @@ export interface ProfileReport {
   results: ProfileResult[];
   /** Gas summary (total L2 + DA) keyed by function name */
   gasSummary: Record<string, number>;
+  /** Proving time summary (in ms) keyed by function name */
+  provingTimeSummary: Record<string, number>;
 }
 
 /** Abstract class for users to extend */
@@ -63,7 +67,7 @@ export abstract class BenchmarkBase {
   /** Optional setup function run before benchmarks */
   abstract setup?(): Promise<BenchmarkContext>;
   /** Function returning the methods to benchmark. Can be a mix of plain interactions or named interactions. */
-  abstract getMethods(context: BenchmarkContext): Array<ContractFunctionInteraction | NamedBenchmarkedInteraction>;
+  abstract getMethods(context: BenchmarkContext): Array<ContractFunctionInteractionCallIntent | NamedBenchmarkedInteraction>;
   /** Optional teardown function run after benchmarks (no longer abstract) */
   teardown?(context: BenchmarkContext): Promise<void>;
 } 

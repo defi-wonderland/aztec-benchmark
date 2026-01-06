@@ -5,7 +5,7 @@ import path from 'node:path';
 import toml from '@iarna/toml';
 import { Profiler } from './profiler.js';
 import { BenchmarkBase, BenchmarkContext, type ProfileResult, type NamedBenchmarkedInteraction } from './types.js';
-import type { ContractFunctionInteraction } from '@aztec/aztec.js';
+import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
 
 /**
  * Represents the structure of the [benchmark] section in Nargo.toml.
@@ -25,6 +25,7 @@ program
   .option('--config <path>', 'Path to the Nargo.toml file', './Nargo.toml')
   .option('-o, --output-dir <path>', 'Directory to save benchmark reports', './benchmarks')
   .option('-s, --suffix <suffix>', 'Optional suffix to append to the report filename (e.g., _pr)')
+  .option('--skip-proving', 'Skip proving transactions (only measure gate counts and gas)')
   /**
    * Main action for the CLI.
    * Parses Nargo.toml, finds and runs specified benchmarks, and saves the reports.
@@ -34,7 +35,7 @@ program
    * @param options.outputDir - Directory to save reports.
    * @param options.suffix - Optional suffix for report filenames.
    */
-  .action(async (options: { contracts?: string[], config: string, outputDir: string, suffix?: string }) => {
+  .action(async (options: { contracts?: string[], config: string, outputDir: string, suffix?: string, skipProving?: boolean }) => {
 
     const nargoTomlPath = path.resolve(process.cwd(), options.config);
     const outputDir = path.resolve(process.cwd(), options.outputDir);
@@ -89,8 +90,6 @@ program
       `Found ${contractsToRunNames.length} benchmark(s) to run: ${contractsToRunNames.join(', ')}`,
     );
 
-    const profiler = new Profiler();
-
     // Iterate over the filtered contract names
     for (const contractName of contractsToRunNames) {
       const benchmarkFileName = availableBenchmarks[contractName];
@@ -125,9 +124,15 @@ program
           runContext = await benchmarkInstance.setup();
           console.log(`Setup complete for ${contractName}.`);
         }
+        if (!options.skipProving && !runContext.wallet) {
+          console.error(`Error: setup() must return a context with a 'wallet' property when proving is enabled.`);
+          process.exit(1);
+        }
+
+        const profiler = new Profiler(runContext.wallet, { skipProving: options.skipProving });
 
         console.log(`Getting methods to benchmark for ${contractName}...`);
-        const interactionsToBenchmark: Array<ContractFunctionInteraction | NamedBenchmarkedInteraction> = benchmarkInstance.getMethods(runContext);
+        const interactionsToBenchmark: Array<ContractFunctionInteractionCallIntent | NamedBenchmarkedInteraction> = benchmarkInstance.getMethods(runContext);
 
         if (!Array.isArray(interactionsToBenchmark) || interactionsToBenchmark.length === 0) {
           console.warn(`No benchmark methods returned by getMethods for ${contractName}. Saving empty report.`);

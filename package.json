@@ -1,6 +1,6 @@
 {
   "name": "@defi-wonderland/aztec-benchmark",
-  "version": "2.0.0",
+  "version": "3.0.0-devnet.20251212",
   "description": "CLI tool and GitHub Action for Aztec contract benchmarking",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -33,7 +33,8 @@
   "dependencies": {
     "@actions/core": "1.10.1",
     "@actions/exec": "1.1.1",
-    "@aztec/aztec.js": "2.0.3",
+    "@aztec/test-wallet": "3.0.0-devnet.20251212",
+    "@aztec/aztec.js": "3.0.0-devnet.20251212",
     "@iarna/toml": "2.2.5",
     "@types/node": "22.15.3",
     "commander": "13.1.0",

@@ -1,8 +1,11 @@
-import { type ContractFunctionInteraction } from '@aztec/aztec.js';
+import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
+import { proveInteraction } from '@aztec/test-wallet/server';
+import { TestWallet } from '@aztec/test-wallet/server';
+
+
 import fs from 'node:fs';
 import {
   type ProfileResult,
-  type GateCount,
   type ProfileReport,
   type Gas,
   type GasLimits,
@@ -27,25 +30,41 @@ function sumGas(gas: Gas): number {
   return (gas?.daGas ?? 0) + (gas?.l2Gas ?? 0);
 }
 
+interface ProfilerOptions {
+  skipProving?: boolean;
+}
+
 /**
- * Profiles Aztec contract functions to measure gate counts and gas usage.
+ * Profiles Aztec contract functions to measure gate counts, gas usage and proving time.
  */
 export class Profiler {
+  #wallet?: TestWallet;
+  #skipProving: boolean;
+
+  constructor(wallet?: TestWallet, options?: ProfilerOptions) {
+    this.#wallet = wallet;
+    this.#skipProving = options?.skipProving ?? false;
+    
+    if (!this.#skipProving && !wallet) {
+      throw new Error('Wallet is required when proving is enabled');
+    }
+  }
+
   /**
    * Profiles a list of contract function interactions. 
    * Items can be plain interactions or objects with an interaction and a custom name.
    * @param fsToProfile - An array of items to profile.
    * @returns A promise that resolves to an array of profile results.
    */
-  async profile(fsToProfile: Array<ContractFunctionInteraction | NamedBenchmarkedInteraction>): Promise<ProfileResult[]> {
+  async profile(fsToProfile: Array<ContractFunctionInteractionCallIntent | NamedBenchmarkedInteraction>): Promise<ProfileResult[]> {
     const results: ProfileResult[] = [];
     for (const item of fsToProfile) {
       if ('interaction' in item && 'name' in item) {
         // This is a NamedBenchmarkedInteraction object
         results.push(await this.#profileOne(item.interaction, item.name));
       } else {
-        // This is a plain ContractFunctionInteraction
-        results.push(await this.#profileOne(item as ContractFunctionInteraction)); // Pass undefined for customName
+        // This is a plain ContractFunctionInteractionCallIntent
+        results.push(await this.#profileOne(item as ContractFunctionInteractionCallIntent)); // Pass undefined for customName
       }
     }
     return results;
@@ -62,7 +81,7 @@ export class Profiler {
       console.log(`No results to save for ${filename}. Saving empty report.`);
       fs.writeFileSync(
         filename,
-        JSON.stringify({ summary: {}, results: [], gasSummary: {} } as ProfileReport, null, 2),
+        JSON.stringify({ summary: {}, gasSummary: {}, provingTimeSummary: {}, results: [] } as ProfileReport, null, 2),
       );
       return;
     }
@@ -85,10 +104,19 @@ export class Profiler {
       {} as Record<string, number>,
     );
 
+    const provingTimeSummary = results.reduce(
+      (acc, result) => ({
+        ...acc,
+        [result.name]: result.provingTime ?? 0,
+      }),
+      {} as Record<string, number>,
+    );
+
     const report: ProfileReport = {
       summary,
-      results: results,
       gasSummary,
+      provingTimeSummary,
+      results: results,
     };
 
     console.log(`Saving results for ${results.length} methods in ${filename}`);
@@ -108,14 +136,14 @@ export class Profiler {
    *          Returns a result with FAILED in the name and zero counts/gas if profiling errors.
    * @private
    */
-  async #profileOne(f: ContractFunctionInteraction, customName?: string): Promise<ProfileResult> {
+  async #profileOne(f: ContractFunctionInteractionCallIntent, customName?: string): Promise<ProfileResult> {
     let name: string;
     if (customName) {
       name = customName;
     } else {
       // Name discovery logic (reinstated)
       try {
-        const executionPayload = await f.request(); // Note: f.request() might be an issue if f is already a PxeSimoneResponse - check aztec.js docs
+        const executionPayload = await f.action.request(); // Note: f.request() might be an issue if f is already a PxeSimoneResponse - check aztec.js docs
         if (executionPayload.calls && executionPayload.calls.length > 0) {
           const firstCall = executionPayload.calls[0];
           // Attempt to get a meaningful name
@@ -140,14 +168,25 @@ export class Profiler {
     console.log(`Profiling ${name}...`);
 
     try {
-      // TODO: This is required as we need the sender to call estimate gas and there is
-      // no other way to get the sender without creating a tx request
-      const txRequest = await f.create();
-      const origin = txRequest.origin;
+      const origin = f.caller;
 
-      const gas: GasLimits = await f.estimateGas({ from: origin });
-      const profileResults = await f.profile({ profileMode: 'full', from: origin });
-      await f.send({ from: origin }).wait();
+      // Gas simulated is 10% higher by default, we set the padding to 0 to get a better estimate.
+      const gas: GasLimits = (await f.action.simulate({ from: origin, fee: { estimateGas: true, estimatedGasPadding: 0 } })).estimatedGas;
+      // We cannot send a profiled tx proof, so we skip proof generation. We still need to profile gate counts.
+      const profileResults = await f.action.profile({ profileMode: 'full', from: origin, skipProofGeneration: true });
+
+      let provingTime: number | undefined;
+
+      if (!this.#skipProving && this.#wallet) {
+        // We prove the tx to get the proving time.
+        const provenTx = await proveInteraction(this.#wallet, f.action, { from: f.caller });
+        // We send the tx. We could get the gas used from the receipt.
+        await provenTx.send().wait();
+        provingTime = provenTx.stats?.timings?.proving;
+      } else {
+        // We send the tx. We could get the gas used from the receipt.
+        await f.action.send({ from: origin }).wait();
+      }
 
       const result: ProfileResult = {
         name,
@@ -161,11 +200,13 @@ export class Profiler {
           gateCount: step.gateCount || 0,
         })),
         gas,
+        provingTime,
       };
 
       const daGas = gas?.gasLimits?.daGas ?? 'N/A';
       const l2Gas = gas?.gasLimits?.l2Gas ?? 'N/A';
-      console.log(` -> ${name}: ${result.totalGateCount} gates, Gas (DA: ${daGas}, L2: ${l2Gas})`);
+      const provingDisplay = provingTime !== undefined ? `${provingTime}ms` : 'skipped';
+      console.log(` -> ${name}: ${result.totalGateCount} gates, Gas (DA: ${daGas}, L2: ${l2Gas}), Proving: ${provingDisplay}`);
       return result;
     } catch (error: any) {
       console.error(`Error profiling ${name}:`, error.message);

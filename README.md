@@ -57,6 +57,7 @@ The paths to the `.benchmark.ts` files are relative to the `Nargo.toml` file.
 - `--config <path>`: Path to your `Nargo.toml` file (default: `./Nargo.toml`).
 - `-o, --output-dir <path>`: Directory to save benchmark JSON reports (default: `./benchmarks`).
 - `-s, --suffix <suffix>`: Optional suffix to append to report filenames (e.g., `_pr` results in `token_pr.benchmark.json`).
+- `--skip-proving`: Skip proving transactions. Only measures gate counts and gas; proving time will be `0` in reports. When enabled, the `wallet` is not required in the benchmark context.
 
 ### Examples
 
@@ -80,30 +81,31 @@ npx aztec-benchmark --contracts token another_contract --output-dir ./benchmark_
 ## Writing Benchmarks
 
 Benchmarks are TypeScript classes extending `BenchmarkBase` from this package.
-Each entry in the array returned by `getMethods` can either be a plain `ContractFunctionInteraction` 
+Each entry in the array returned by `getMethods` can either be a plain `ContractFunctionInteractionCallIntent` 
 (in which case the benchmark name is auto-derived) or a `NamedBenchmarkedInteraction` object 
 (which includes the `interaction` and a custom `name` for reporting).
 
 ```ts
 import {
   Benchmark, // Alias for BenchmarkBase
-  type BenchmarkContext, 
-  type NamedBenchmarkedInteraction 
+  type BenchmarkContext,
+  type NamedBenchmarkedInteraction
 } from '@defi-wonderland/aztec-benchmark';
-import {
-  type AccountWallet,
-  type ContractFunctionInteraction,
-  type PXE,
-  type Contract, // Generic Contract type from Aztec.js
-  createPXEClient, // Example import
-  getInitialTestAccountsWallets // Example import
-} from '@aztec/aztec.js';
+import type { PXE } from '@aztec/pxe/server';
+import type { Contract } from '@aztec/aztec.js/contracts'; // Generic Contract type from Aztec.js
+import type { AztecAddress } from '@aztec/aztec.js/addresses';
+import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
+import { createStore } from '@aztec/kv-store/lmdb-v2';
+import { createPXE, getPXEConfig } from '@aztec/pxe/server';
+import { createAztecNodeClient, waitForNode } from '@aztec/aztec.js/node';
+import { registerInitialSandboxAccountsInWallet, type TestWallet } from '@aztec/test-wallet/server';
 // import { YourSpecificContract } from '../artifacts/YourSpecificContract.js'; // Replace with your actual contract artifact
 
 // 1. Define a specific context for your benchmark (optional but good practice)
 interface MyBenchmarkContext extends BenchmarkContext {
   pxe: PXE;
-  deployer: AccountWallet;
+  wallet: TestWallet;
+  deployer: AztecAddress;
   contract: Contract; // Use the generic Contract type or your specific contract type
 }
 
@@ -111,22 +113,39 @@ export default class MyContractBenchmark extends Benchmark {
   // Runs once before all benchmark methods.
   async setup(): Promise<MyBenchmarkContext> {
     console.log('Setting up benchmark environment...');
-    const pxe = createPXEClient(process.env.PXE_URL || 'http://localhost:8080');
-    const [deployer] = await getInitialTestAccountsWallets(pxe);
+
+    const { NODE_URL = 'http://localhost:8080' } = process.env;
+    const node = createAztecNodeClient(NODE_URL);
+    await waitForNode(node);
+    const l1Contracts = await node.getL1ContractAddresses();
+    const config = getPXEConfig();
+    const fullConfig = { ...config, l1Contracts };
+    // IMPORTANT: true enables proof generation for the benchmark, set it to false when using --skip-proving
+    fullConfig.proverEnabled = true;
+    const pxeVersion = 2;
+    const store = await createStore('pxe', pxeVersion, {
+      dataDirectory: 'store',
+      dataStoreMapSizeKb: 1e6,
+    });
+
+    const pxe: PXE = await createPXE(node, fullConfig, { store });
+    const wallet: TestWallet = await TestWallet.create(node, { ...fullConfig, proverEnabled });
+    const accounts: AztecAddress[] = await registerInitialSandboxAccountsInWallet(wallet);
+    const [deployer] = accounts;
     
     //  Deploy your contract (replace YourSpecificContract with your actual contract class)
     const deployedContract = await YourSpecificContract
-      .deploy(deployer, /* constructor args */)
-      .send({ from: deployer.getAddress() })
+      .deploy(wallet, /* constructor args */)
+      .send({ from: deployer })
       .deployed();
-    const contract = await YourSpecificContract.at(deployedContract.address, deployer);
+    const contract = await YourSpecificContract.at(deployedContract.address, wallet);
     console.log('Contract deployed at:', contract.address.toString());
 
     return { pxe, deployer, contract }; 
   }
 
   // Returns an array of interactions to benchmark. 
-  async getMethods(context: MyBenchmarkContext): Promise<Array<ContractFunctionInteraction | NamedBenchmarkedInteraction>> {
+  getMethods(context: MyBenchmarkContext): Promise<Array<ContractFunctionInteractionCallIntent | NamedBenchmarkedInteraction>> {
     // Ensure context is available (it should be if setup ran correctly)
     if (!context || !context.contract) {
       // In a real scenario, setup() must initialize the context properly.
@@ -136,12 +155,12 @@ export default class MyContractBenchmark extends Benchmark {
     }
     
     const { contract, deployer } = context;
-    const recipient = deployer.getAddress(); // Example recipient
+    const recipient = deployer; // Example recipient
 
     // Replace `contract.methods.someMethodName` with actual methods from your contract.
-    const interactionPlain = contract.methods.transfer(recipient, 100n); 
-    const interactionNamed1 = contract.methods.someOtherMethod("test_value_1");
-    const interactionNamed2 = contract.methods.someOtherMethod("test_value_2");
+    const interactionPlain = { caller: deployer, action: contract.methods.transfer(recipient, 100n) }
+    const interactionNamed1 = { caller: deployer, action: contract.methods.someOtherMethod("test_value_1") };
+    const interactionNamed2 = { caller: deployer, action: contract.methods.someOtherMethod("test_value_2") };
 
     return [
       // Example of a plain interaction - name will be auto-derived
@@ -164,9 +183,9 @@ export default class MyContractBenchmark extends Benchmark {
 ```
 
 **Note:** Your benchmark code needs a valid Aztec project setup to interact with contracts.
-Your `BenchmarkBase` implementation is responsible for constructing the `ContractFunctionInteraction` objects.
+Your `BenchmarkBase` implementation is responsible for constructing the `ContractFunctionInteractionCallIntent` objects.
 If you provide a `NamedBenchmarkedInteraction` object, its `name` field will be used in reports. 
-If you provide a plain `ContractFunctionInteraction`, the tool will attempt to derive a name from the interaction (e.g., the method name).
+If you provide a plain `ContractFunctionInteractionCallIntent`, the tool will attempt to derive a name from the interaction (e.g., the method name).
 
 ### Wonderland's Usage Example
 
