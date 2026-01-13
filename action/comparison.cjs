@@ -221,7 +221,7 @@ function generateContractComparisonTable(pair, threshold) {
     '  <th colspan="3">Gates</th>',
     '  <th colspan="3">DA Gas</th>',
     '  <th colspan="3">L2 Gas</th>',
-    '  <th colspan="3">Proving Time ms</th>',
+    '  <th colspan="3">Proving Time (ms)</th>',
     '</tr>',
     '<tr>',
     '  <th>Status</th>',
