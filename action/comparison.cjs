@@ -2,6 +2,29 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 /**
+ * Formats system info as a markdown table.
+ * @param {object} systemInfo - The system info object from benchmark JSON.
+ * @returns {string} Markdown table showing system hardware info.
+ */
+function formatSystemInfoTable(systemInfo) {
+  if (!systemInfo) {
+    return '| CPU | Cores | RAM | Arch |\n|-----|-------|-----|------|\n| N/A | N/A | N/A | N/A |\n';
+  }
+
+  const cpu = systemInfo.cpuModel || 'N/A';
+  const cores = systemInfo.cpuCores || 'N/A';
+  const ram = systemInfo.totalMemoryGB ? `${systemInfo.totalMemoryGB} GB` : 'N/A';
+  const arch = systemInfo.arch || 'N/A';
+
+  return [
+    '| CPU | Cores | RAM | Arch |',
+    '|-----|-------|-----|------|',
+    `| ${cpu} | ${cores} | ${ram} | ${arch} |`,
+    '',
+  ].join('\n');
+}
+
+/**
  * Extracts DA (Data Availability) gas from a benchmark result.
  * @param {object} result - The benchmark result object.
  * @returns {number} The DA gas value, or 0 if not found.
@@ -289,6 +312,20 @@ function runComparison(inputs) {
 
   // Sort pairs by contract name for consistent report order
   benchmarkPairs.sort((a, b) => a.contractName.localeCompare(b.contractName));
+
+  // Read system info from benchmark report (all reports have the same info since they run on the same machine)
+  let systemInfo = null;
+  if (benchmarkPairs.length > 0) {
+    try {
+      const firstReport = JSON.parse(fs.readFileSync(benchmarkPairs[0].prJsonPath, 'utf-8'));
+      systemInfo = firstReport.systemInfo;
+    } catch (e) {
+      console.warn('Could not read system info from benchmark report:', e.message);
+    }
+  }
+
+  // Add system info table (displayed once at the top)
+  markdownOutput.push(formatSystemInfoTable(systemInfo));
 
   for (const pair of benchmarkPairs) {
     console.log(`\nProcessing contract: ${pair.contractName}...`);

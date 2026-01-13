@@ -2,7 +2,6 @@ import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/auth
 import { proveInteraction } from '@aztec/test-wallet/server';
 import { TestWallet } from '@aztec/test-wallet/server';
 
-
 import fs from 'node:fs';
 import {
   type ProfileResult,
@@ -11,6 +10,7 @@ import {
   type GasLimits,
   type NamedBenchmarkedInteraction,
 } from './types.js';
+import { getSystemInfo } from './systemInfo.js';
 
 /**
  * Sums all numbers in an array.
@@ -77,11 +77,13 @@ export class Profiler {
    * @param filename - The name of the file to save the results to.
    */
   async saveResults(results: ProfileResult[], filename: string) {
+    const systemInfo = getSystemInfo();
+
     if (!results.length) {
       console.log(`No results to save for ${filename}. Saving empty report.`);
       fs.writeFileSync(
         filename,
-        JSON.stringify({ summary: {}, gasSummary: {}, provingTimeSummary: {}, results: [] } as ProfileReport, null, 2),
+        JSON.stringify({ summary: {}, results: [], gasSummary: {}, provingTimeSummary: {}, systemInfo } as ProfileReport, null, 2),
       );
       return;
     }
@@ -114,9 +116,10 @@ export class Profiler {
 
     const report: ProfileReport = {
       summary,
+      results: results,
       gasSummary,
       provingTimeSummary,
-      results: results,
+      systemInfo,
     };
 
     console.log(`Saving results for ${results.length} methods in ${filename}`);
