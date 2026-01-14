@@ -10,29 +10,14 @@ function getEffectiveCpuCount() {
     return os.cpus().length;
 }
 /**
- * Gets the effective memory in GB, respecting container limits.
+ * Gets the effective memory in GiB, respecting container limits.
  * Uses constrainedMemory() which is cgroup-aware in Node 19.6+
  */
-function getEffectiveMemoryGB() {
+function getEffectiveMemoryGiB() {
     const constrainedMemory = process.constrainedMemory?.();
     const bytes = constrainedMemory ?? os.totalmem();
-    return Math.round(bytes / (1024 * 1024 * 1024));
-}
-/**
- * Shortens CPU model string to be more readable.
- * e.g., "AMD EPYC 7763 64-Core Processor" -> "AMD EPYC 7763"
- */
-function shortenCpuModel(model) {
-    // Remove common suffixes and limit to first 3-4 meaningful words
-    return model
-        .replace(/\s+@\s+[\d.]+GHz/i, '')
-        .replace(/\s*\d+-Core Processor/i, '')
-        .replace(/\(R\)|\(TM\)/gi, '')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .split(' ')
-        .slice(0, 4)
-        .join(' ');
+    const gib = bytes / (1024 * 1024 * 1024);
+    return Math.round(gib);
 }
 /**
  * Collects system information for benchmark reports.
@@ -41,17 +26,8 @@ function shortenCpuModel(model) {
 export function getSystemInfo() {
     let cpuModel = 'N/A';
     let cpuCores = 0;
-    let totalMemoryGB = 0;
+    let totalMemoryGiB = 0;
     let arch = 'N/A';
-    try {
-        const cpus = os.cpus();
-        if (cpus && cpus.length > 0 && cpus[0]?.model) {
-            cpuModel = shortenCpuModel(cpus[0].model);
-        }
-    }
-    catch {
-        // Keep default N/A
-    }
     try {
         cpuCores = getEffectiveCpuCount();
     }
@@ -59,7 +35,7 @@ export function getSystemInfo() {
         // Keep default 0
     }
     try {
-        totalMemoryGB = getEffectiveMemoryGB();
+        totalMemoryGiB = getEffectiveMemoryGiB();
     }
     catch {
         // Keep default 0
@@ -71,10 +47,19 @@ export function getSystemInfo() {
     catch {
         // Keep default N/A
     }
+    try {
+        const cpus = os.cpus();
+        if (cpus && cpus.length > 0 && cpus[0]?.model) {
+            cpuModel = cpus[0].model.trim();
+        }
+    }
+    catch {
+        // Keep default N/A
+    }
     return {
         cpuModel,
         cpuCores,
-        totalMemoryGB,
+        totalMemoryGiB,
         arch,
     };
 }

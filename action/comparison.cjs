@@ -13,7 +13,7 @@ function formatSystemInfoTable(systemInfo) {
 
   const cpu = systemInfo.cpuModel || 'N/A';
   const cores = systemInfo.cpuCores || 'N/A';
-  const ram = systemInfo.totalMemoryGB ? `${systemInfo.totalMemoryGB} GB` : 'N/A';
+  const ram = systemInfo.totalMemoryGiB ? `${systemInfo.totalMemoryGiB} GiB` : 'N/A';
   const arch = systemInfo.arch || 'N/A';
 
   return [

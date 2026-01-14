@@ -5,8 +5,8 @@ export interface SystemInfo {
   cpuModel: string;
   /** Number of available CPU cores (container-aware) */
   cpuCores: number;
-  /** Total available memory in GB (container-aware) */
-  totalMemoryGB: number;
+  /** Total available memory in GiB (container-aware) */
+  totalMemoryGiB: number;
   /** CPU architecture (e.g., 'x64', 'arm64') */
   arch: string;
 }
@@ -23,30 +23,14 @@ function getEffectiveCpuCount(): number {
 }
 
 /**
- * Gets the effective memory in GB, respecting container limits.
+ * Gets the effective memory in GiB, respecting container limits.
  * Uses constrainedMemory() which is cgroup-aware in Node 19.6+
  */
-function getEffectiveMemoryGB(): number {
+function getEffectiveMemoryGiB(): number {
   const constrainedMemory = (process as any).constrainedMemory?.();
   const bytes = constrainedMemory ?? os.totalmem();
-  return Math.round(bytes / (1024 * 1024 * 1024));
-}
-
-/**
- * Shortens CPU model string to be more readable.
- * e.g., "AMD EPYC 7763 64-Core Processor" -> "AMD EPYC 7763"
- */
-function shortenCpuModel(model: string): string {
-  // Remove common suffixes and limit to first 3-4 meaningful words
-  return model
-    .replace(/\s+@\s+[\d.]+GHz/i, '')
-    .replace(/\s*\d+-Core Processor/i, '')
-    .replace(/\(R\)|\(TM\)/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .split(' ')
-    .slice(0, 4)
-    .join(' ');
+  const gib = bytes / (1024 * 1024 * 1024);
+  return Math.round(gib);
 }
 
 /**
@@ -56,17 +40,8 @@ function shortenCpuModel(model: string): string {
 export function getSystemInfo(): SystemInfo {
   let cpuModel = 'N/A';
   let cpuCores = 0;
-  let totalMemoryGB = 0;
+  let totalMemoryGiB = 0;
   let arch = 'N/A';
-
-  try {
-    const cpus = os.cpus();
-    if (cpus && cpus.length > 0 && cpus[0]?.model) {
-      cpuModel = shortenCpuModel(cpus[0].model);
-    }
-  } catch {
-    // Keep default N/A
-  }
 
   try {
     cpuCores = getEffectiveCpuCount();
@@ -75,7 +50,7 @@ export function getSystemInfo(): SystemInfo {
   }
 
   try {
-    totalMemoryGB = getEffectiveMemoryGB();
+    totalMemoryGiB = getEffectiveMemoryGiB();
   } catch {
     // Keep default 0
   }
@@ -87,10 +62,19 @@ export function getSystemInfo(): SystemInfo {
     // Keep default N/A
   }
 
+  try {
+    const cpus = os.cpus();
+    if (cpus && cpus.length > 0 && cpus[0]?.model) {
+      cpuModel = cpus[0].model.trim();
+    }
+  } catch {
+    // Keep default N/A
+  }
+
   return {
     cpuModel,
     cpuCores,
-    totalMemoryGB,
+    totalMemoryGiB,
     arch,
   };
 }

@@ -3,8 +3,8 @@ export interface SystemInfo {
     cpuModel: string;
     /** Number of available CPU cores (container-aware) */
     cpuCores: number;
-    /** Total available memory in GB (container-aware) */
-    totalMemoryGB: number;
+    /** Total available memory in GiB (container-aware) */
+    totalMemoryGiB: number;
     /** CPU architecture (e.g., 'x64', 'arm64') */
     arch: string;
 }
