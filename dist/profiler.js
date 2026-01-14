@@ -12,6 +12,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 var _Profiler_instances, _Profiler_wallet, _Profiler_skipProving, _Profiler_profileOne;
 import { proveInteraction } from '@aztec/test-wallet/server';
 import fs from 'node:fs';
+import { getSystemInfo } from './systemInfo.js';
 /**
  * Sums all numbers in an array.
  * @param arr - The array of numbers to sum.
@@ -69,9 +70,10 @@ export class Profiler {
      * @param filename - The name of the file to save the results to.
      */
     async saveResults(results, filename) {
+        const systemInfo = getSystemInfo();
         if (!results.length) {
             console.log(`No results to save for ${filename}. Saving empty report.`);
-            fs.writeFileSync(filename, JSON.stringify({ summary: {}, gasSummary: {}, provingTimeSummary: {}, results: [] }, null, 2));
+            fs.writeFileSync(filename, JSON.stringify({ summary: {}, results: [], gasSummary: {}, provingTimeSummary: {}, systemInfo }, null, 2));
             return;
         }
         const summary = results.reduce((acc, result) => ({
@@ -90,9 +92,10 @@ export class Profiler {
         }), {});
         const report = {
             summary,
+            results: results,
             gasSummary,
             provingTimeSummary,
-            results: results,
+            systemInfo,
         };
         console.log(`Saving results for ${results.length} methods in ${filename}`);
         try {
