@@ -10,18 +10,10 @@ function getEffectiveCpuCount() {
     return os.cpus().length;
 }
 /**
- * Gets the effective memory in GiB, respecting container limits.
- * Uses constrainedMemory() which is cgroup-aware in Node 19.6+
+ * Gets total system memory in GiB.
  */
-function getEffectiveMemoryGiB() {
-    const constrainedMemory = process.constrainedMemory?.();
-    const bytes = constrainedMemory ?? os.totalmem();
-    const gib = bytes / (1024 * 1024 * 1024);
-    console.log('constrainedMemory', constrainedMemory);
-    console.log('os.totalmem()', os.totalmem());
-    console.log('bytes', bytes);
-    console.log('gib', gib);
-    return Math.round(gib);
+function getTotalMemoryGiB() {
+    return Math.round(os.totalmem() / (1024 * 1024 * 1024));
 }
 /**
  * Collects system information for benchmark reports.
@@ -39,7 +31,7 @@ export function getSystemInfo() {
         // Keep default 0
     }
     try {
-        totalMemoryGiB = getEffectiveMemoryGiB();
+        totalMemoryGiB = getTotalMemoryGiB();
     }
     catch {
         // Keep default 0

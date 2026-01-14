@@ -3,9 +3,9 @@ import * as os from 'node:os';
 export interface SystemInfo {
   /** CPU model name */
   cpuModel: string;
-  /** Number of available CPU cores (container-aware) */
+  /** Number of available CPU cores */
   cpuCores: number;
-  /** Total available memory in GiB (container-aware) */
+  /** Total system memory in GiB */
   totalMemoryGiB: number;
   /** CPU architecture (e.g., 'x64', 'arm64') */
   arch: string;
@@ -23,18 +23,10 @@ function getEffectiveCpuCount(): number {
 }
 
 /**
- * Gets the effective memory in GiB, respecting container limits.
- * Uses constrainedMemory() which is cgroup-aware in Node 19.6+
+ * Gets total system memory in GiB.
  */
-function getEffectiveMemoryGiB(): number {
-  const constrainedMemory = (process as any).constrainedMemory?.();
-  const bytes = constrainedMemory ?? os.totalmem();
-  const gib = bytes / (1024 * 1024 * 1024);
-  console.log('constrainedMemory', constrainedMemory);
-  console.log('os.totalmem()', os.totalmem());
-  console.log('bytes', bytes);
-  console.log('gib', gib);
-  return Math.round(gib);
+function getTotalMemoryGiB(): number {
+  return Math.round(os.totalmem() / (1024 * 1024 * 1024));
 }
 
 /**
@@ -54,7 +46,7 @@ export function getSystemInfo(): SystemInfo {
   }
 
   try {
-    totalMemoryGiB = getEffectiveMemoryGiB();
+    totalMemoryGiB = getTotalMemoryGiB();
   } catch {
     // Keep default 0
   }

@@ -1,9 +1,9 @@
 export interface SystemInfo {
     /** CPU model name */
     cpuModel: string;
-    /** Number of available CPU cores (container-aware) */
+    /** Number of available CPU cores */
     cpuCores: number;
-    /** Total available memory in GiB (container-aware) */
+    /** Total system memory in GiB */
     totalMemoryGiB: number;
     /** CPU architecture (e.g., 'x64', 'arm64') */
     arch: string;
