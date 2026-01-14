@@ -1,10 +1,15 @@
 import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
+import { TestWallet } from '@aztec/test-wallet/server';
 import { type ProfileResult, type NamedBenchmarkedInteraction } from './types.js';
+interface ProfilerOptions {
+    skipProving?: boolean;
+}
 /**
- * Profiles Aztec contract functions to measure gate counts and gas usage.
+ * Profiles Aztec contract functions to measure gate counts, gas usage and proving time.
  */
 export declare class Profiler {
     #private;
+    constructor(wallet?: TestWallet, options?: ProfilerOptions);
     /**
      * Profiles a list of contract function interactions.
      * Items can be plain interactions or objects with an interaction and a custom name.
@@ -20,3 +25,4 @@ export declare class Profiler {
      */
     saveResults(results: ProfileResult[], filename: string): Promise<void>;
 }
+export {};

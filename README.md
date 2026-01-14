@@ -57,6 +57,7 @@ The paths to the `.benchmark.ts` files are relative to the `Nargo.toml` file.
 - `--config <path>`: Path to your `Nargo.toml` file (default: `./Nargo.toml`).
 - `-o, --output-dir <path>`: Directory to save benchmark JSON reports (default: `./benchmarks`).
 - `-s, --suffix <suffix>`: Optional suffix to append to report filenames (e.g., `_pr` results in `token_pr.benchmark.json`).
+- `--skip-proving`: Skip proving transactions. Only measures gate counts and gas; proving time will be `0` in reports. When enabled, the `wallet` is not required in the benchmark context.
 
 ### Examples
 
@@ -119,7 +120,8 @@ export default class MyContractBenchmark extends Benchmark {
     const l1Contracts = await node.getL1ContractAddresses();
     const config = getPXEConfig();
     const fullConfig = { ...config, l1Contracts };
-    fullConfig.proverEnabled = false;
+    // IMPORTANT: true enables proof generation for the benchmark, set it to false when using --skip-proving
+    fullConfig.proverEnabled = true;
     const pxeVersion = 2;
     const store = await createStore('pxe', pxeVersion, {
       dataDirectory: 'store',
@@ -127,7 +129,7 @@ export default class MyContractBenchmark extends Benchmark {
     });
 
     const pxe: PXE = await createPXE(node, fullConfig, { store });
-    const wallet: TestWallet = await TestWallet.create(node);
+    const wallet: TestWallet = await TestWallet.create(node, { ...fullConfig, proverEnabled });
     const accounts: AztecAddress[] = await registerInitialSandboxAccountsInWallet(wallet);
     const [deployer] = accounts;
     

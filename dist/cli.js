@@ -12,6 +12,7 @@ program
     .option('--config <path>', 'Path to the Nargo.toml file', './Nargo.toml')
     .option('-o, --output-dir <path>', 'Directory to save benchmark reports', './benchmarks')
     .option('-s, --suffix <suffix>', 'Optional suffix to append to the report filename (e.g., _pr)')
+    .option('--skip-proving', 'Skip proving transactions (only measure gate counts and gas)')
     /**
      * Main action for the CLI.
      * Parses Nargo.toml, finds and runs specified benchmarks, and saves the reports.
@@ -64,7 +65,6 @@ program
         process.exit(1);
     }
     console.log(`Found ${contractsToRunNames.length} benchmark(s) to run: ${contractsToRunNames.join(', ')}`);
-    const profiler = new Profiler();
     // Iterate over the filtered contract names
     for (const contractName of contractsToRunNames) {
         const benchmarkFileName = availableBenchmarks[contractName];
@@ -92,6 +92,11 @@ program
                 runContext = await benchmarkInstance.setup();
                 console.log(`Setup complete for ${contractName}.`);
             }
+            if (!options.skipProving && !runContext.wallet) {
+                console.error(`Error: setup() must return a context with a 'wallet' property when proving is enabled.`);
+                process.exit(1);
+            }
+            const profiler = new Profiler(runContext.wallet, { skipProving: options.skipProving });
             console.log(`Getting methods to benchmark for ${contractName}...`);
             const interactionsToBenchmark = benchmarkInstance.getMethods(runContext);
             if (!Array.isArray(interactionsToBenchmark) || interactionsToBenchmark.length === 0) {
