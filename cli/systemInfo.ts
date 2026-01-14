@@ -30,6 +30,10 @@ function getEffectiveMemoryGiB(): number {
   const constrainedMemory = (process as any).constrainedMemory?.();
   const bytes = constrainedMemory ?? os.totalmem();
   const gib = bytes / (1024 * 1024 * 1024);
+  console.log('constrainedMemory', constrainedMemory);
+  console.log('os.totalmem()', os.totalmem());
+  console.log('bytes', bytes);
+  console.log('gib', gib);
   return Math.round(gib);
 }
 
