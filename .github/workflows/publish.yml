@@ -1,6 +1,8 @@
 name: Publish Aztec Benchmark Package
 
 on:
+  release:
+    types: [published]
   workflow_call:
   workflow_dispatch:
 
@@ -42,6 +44,14 @@ jobs:
         if: github.ref == 'refs/heads/dev'
         run: npm publish --access public --tag snapshot
 
-      - name: Publish stable (main branch)
+      - name: Publish (main branch)
         if: github.ref == 'refs/heads/main'
-        run: npm publish --access public
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ "$VERSION" == *-* ]]; then
+            TAG="${VERSION#*-}"    # Remove everything before first -
+            TAG="${TAG%%.*}"       # Remove everything after first .
+            npm publish --access public --tag "$TAG"
+          else
+            npm publish --access public
+          fi
