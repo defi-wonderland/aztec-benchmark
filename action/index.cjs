@@ -23,6 +23,7 @@ async function run() {
     const currentSuffix = core.getInput('current_suffix');
     const configPath = core.getInput('config_path');
     const reportsDir = core.getInput('reports_dir');
+    const onlyReport = core.getInput('only_report') === 'true';
 
     core.info('--- Inputs ---');
     core.info(`Config Path: ${configPath}`);
@@ -31,27 +32,32 @@ async function run() {
     core.info(`Reports Directory: ${reportsDir}`);
     core.info(`Base Suffix: ${baseSuffix}`);
     core.info(`Current Suffix: ${currentSuffix}`);
+    core.info(`Only report: ${onlyReport}`);
 
     if (isNaN(threshold)) {
       throw new Error('Invalid threshold value. Please provide a number.');
     }
 
-    core.startGroup('Generating latest benchmark reports (all contracts)');
-    const cliArgs = [];
-    cliArgs.push('--config', configPath);
-    cliArgs.push('--output-dir', reportsDir);
-    cliArgs.push('--suffix', currentSuffix);
+    if (!onlyReport) {
+      core.startGroup('Generating latest benchmark reports (all contracts)');
+      const cliArgs = [];
+      cliArgs.push('--config', configPath);
+      cliArgs.push('--output-dir', reportsDir);
+      cliArgs.push('--suffix', currentSuffix);
 
-    core.info(`Executing: aztec-benchmark ${cliArgs.join(' ')}`);
+      core.info(`Executing: aztec-benchmark ${cliArgs.join(' ')}`);
 
-    const execOptions = {
-      cwd: process.cwd()
-    };
-    const exitCode = await exec.exec('npx aztec-benchmark', cliArgs, execOptions);
-    if (exitCode !== 0) {
-      throw new Error(`Benchmark CLI execution failed with exit code ${exitCode}`);
+      const execOptions = {
+        cwd: process.cwd()
+      };
+      const exitCode = await exec.exec('npx aztec-benchmark', cliArgs, execOptions);
+      if (exitCode !== 0) {
+        throw new Error(`Benchmark CLI execution failed with exit code ${exitCode}`);
+      }
+      core.endGroup();
+    } else {
+      core.info('Skipping aztec-benchmark execution (per only_report input).');
     }
-    core.endGroup();
 
     core.startGroup('Comparing benchmark reports');
     const comparisonInputs = {
