@@ -44,8 +44,8 @@ jobs:
         if: github.ref == 'refs/heads/dev'
         run: npm publish --access public --tag snapshot
 
-      - name: Publish (main branch)
-        if: github.ref == 'refs/heads/main'
+      - name: Publish (main branch or release)
+        if: github.ref == 'refs/heads/main' || (github.event_name == 'release' && github.event.release.target_commitish == 'main')
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if [[ "$VERSION" == *-* ]]; then
