@@ -157,7 +157,6 @@ program
     }
 
     console.log('All specified benchmarks completed successfully.');
-    process.exit(0);
   });
 
 program.parse(process.argv);
