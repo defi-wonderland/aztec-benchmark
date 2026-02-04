@@ -184,11 +184,13 @@ export class Profiler {
         // We prove the tx to get the proving time.
         const provenTx = await proveInteraction(this.#wallet, f.action, { from: f.caller });
         // We send the tx. We could get the gas used from the receipt.
-        await provenTx.send().wait();
+        // In Aztec v4, send() returns Promise<TxReceipt> directly, no need for .wait()
+        await provenTx.send();
         provingTime = provenTx.stats?.timings?.proving;
       } else {
         // We send the tx. We could get the gas used from the receipt.
-        await f.action.send({ from: origin }).wait();
+        // In Aztec v4, send() returns Promise<TxReceipt> directly, no need for .wait()
+        await f.action.send({ from: origin });
       }
 
       const result: ProfileResult = {
