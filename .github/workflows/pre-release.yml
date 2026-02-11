@@ -1,0 +1,13 @@
+name: Pre-Release
+
+on:
+  pull_request: # TODO: Remove this before pushing to dev branch
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  pre-release:
+    uses: defi-wonderland/aztec-ci-actions/.github/workflows/pre-release.yml@dev
+    secrets: inherit
