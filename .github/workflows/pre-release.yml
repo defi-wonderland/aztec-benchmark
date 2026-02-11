@@ -10,4 +10,6 @@ permissions:
 jobs:
   pre-release:
     uses: defi-wonderland/aztec-ci-actions/.github/workflows/pre-release.yml@v0
+    with:
+      run-codegen: false
     secrets: inherit
