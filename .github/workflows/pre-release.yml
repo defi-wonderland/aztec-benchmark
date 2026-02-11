@@ -9,5 +9,5 @@ permissions:
 
 jobs:
   pre-release:
-    uses: defi-wonderland/aztec-ci-actions/.github/workflows/pre-release.yml@dev
+    uses: defi-wonderland/aztec-ci-actions/.github/workflows/pre-release.yml@v0.0.1
     secrets: inherit
