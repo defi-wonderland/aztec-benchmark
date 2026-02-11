@@ -1,4 +1,5 @@
 import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
+import type { FeePaymentMethod } from '@aztec/aztec.js/fee';
 import { proveInteraction } from '@aztec/test-wallet/server';
 import { TestWallet } from '@aztec/test-wallet/server';
 
@@ -32,6 +33,8 @@ function sumGas(gas: Gas): number {
 
 interface ProfilerOptions {
   skipProving?: boolean;
+  /** Fee payment method to use when sending transactions. */
+  feePaymentMethod?: FeePaymentMethod;
 }
 
 /**
@@ -40,10 +43,12 @@ interface ProfilerOptions {
 export class Profiler {
   #wallet?: TestWallet;
   #skipProving: boolean;
+  #feePaymentMethod?: FeePaymentMethod;
 
   constructor(wallet?: TestWallet, options?: ProfilerOptions) {
     this.#wallet = wallet;
     this.#skipProving = options?.skipProving ?? false;
+    this.#feePaymentMethod = options?.feePaymentMethod;
     
     if (!this.#skipProving && !wallet) {
       throw new Error('Wallet is required when proving is enabled');
@@ -180,9 +185,13 @@ export class Profiler {
 
       let provingTime: number | undefined;
 
+      const sendFeeOpts = this.#feePaymentMethod
+        ? { paymentMethod: this.#feePaymentMethod }
+        : undefined;
+
       if (!this.#skipProving && this.#wallet) {
         // We prove the tx to get the proving time.
-        const provenTx = await proveInteraction(this.#wallet, f.action, { from: f.caller });
+        const provenTx = await proveInteraction(this.#wallet, f.action, { from: f.caller, fee: sendFeeOpts });
         // We send the tx. We could get the gas used from the receipt.
         // In Aztec v4, send() returns Promise<TxReceipt> directly, no need for .wait()
         await provenTx.send();
@@ -190,7 +199,7 @@ export class Profiler {
       } else {
         // We send the tx. We could get the gas used from the receipt.
         // In Aztec v4, send() returns Promise<TxReceipt> directly, no need for .wait()
-        await f.action.send({ from: origin });
+        await f.action.send({ from: origin, fee: sendFeeOpts });
       }
 
       const result: ProfileResult = {

@@ -85,6 +85,12 @@ Each entry in the array returned by `getMethods` can either be a plain `Contract
 (in which case the benchmark name is auto-derived) or a `NamedBenchmarkedInteraction` object 
 (which includes the `interaction` and a custom `name` for reporting).
 
+### Fee Payment
+
+By default, every benchmarked account must hold Fee Juice (FJ) to pay for transaction fees. If your accounts don't have pre-existing FJ (e.g. freshly-created accounts on sandbox), you can return a `feePaymentMethod` from `setup()` inside the `BenchmarkContext`. The profiler will pass it to every `send()` and `proveInteraction()` call automatically.
+
+The sandbox ships with a canonical `SponsoredFPC` contract that has FJ and can sponsor fees for any account — making it the easiest way to get benchmarks running without bridging from L1.
+
 ```ts
 import {
   Benchmark, // Alias for BenchmarkBase
@@ -95,6 +101,7 @@ import type { PXE } from '@aztec/pxe/server';
 import type { Contract } from '@aztec/aztec.js/contracts'; // Generic Contract type from Aztec.js
 import type { AztecAddress } from '@aztec/aztec.js/addresses';
 import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
+import type { FeePaymentMethod } from '@aztec/aztec.js/fee';
 import { createStore } from '@aztec/kv-store/lmdb-v2';
 import { createPXE, getPXEConfig } from '@aztec/pxe/server';
 import { createAztecNodeClient, waitForNode } from '@aztec/aztec.js/node';
@@ -107,6 +114,7 @@ interface MyBenchmarkContext extends BenchmarkContext {
   wallet: TestWallet;
   deployer: AztecAddress;
   contract: Contract; // Use the generic Contract type or your specific contract type
+  feePaymentMethod?: FeePaymentMethod;
 }
 
 export default class MyContractBenchmark extends Benchmark {
@@ -141,7 +149,21 @@ export default class MyContractBenchmark extends Benchmark {
     const contract = await YourSpecificContract.at(deployedContract.address, wallet);
     console.log('Contract deployed at:', contract.address.toString());
 
-    return { pxe, deployer, contract }; 
+    // Optional: use SponsoredFPC so accounts don't need pre-existing Fee Juice.
+    // The sandbox ships with a canonical SponsoredFPC pre-deployed at a deterministic address.
+    //
+    // import { SponsoredFeePaymentMethod } from '@aztec/aztec.js/fee/testing';
+    // import { SponsoredFPCContract } from '@aztec/noir-contracts.js/SponsoredFPC';
+    // import { getContractInstanceFromInstantiationParams } from '@aztec/aztec.js/contracts';
+    //
+    // const instance = await getContractInstanceFromInstantiationParams(
+    //   SponsoredFPCContract.artifact,
+    //   { salt: new Fr(0n) },
+    // );
+    // await wallet.registerContract(instance, SponsoredFPCContract.artifact);
+    // const feePaymentMethod = new SponsoredFeePaymentMethod(instance.address);
+
+    return { pxe, wallet, deployer, contract /*, feePaymentMethod */ }; 
   }
 
   // Returns an array of interactions to benchmark. 
@@ -186,6 +208,7 @@ export default class MyContractBenchmark extends Benchmark {
 Your `BenchmarkBase` implementation is responsible for constructing the `ContractFunctionInteractionCallIntent` objects.
 If you provide a `NamedBenchmarkedInteraction` object, its `name` field will be used in reports. 
 If you provide a plain `ContractFunctionInteractionCallIntent`, the tool will attempt to derive a name from the interaction (e.g., the method name).
+If you return a `feePaymentMethod` in the `BenchmarkContext`, it is automatically passed to every transaction the profiler sends — no changes to `getMethods` are needed.
 
 ### Wonderland's Usage Example
 
