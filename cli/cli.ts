@@ -149,6 +149,21 @@ program
           console.log(`Teardown complete for ${contractName}.`);
         }
 
+        // Workaround: PXE.stop() doesn't release all resources
+        // @see https://github.com/AztecProtocol/aztec-packages/issues/20446
+        if (runContext.wallet) {
+            const pxe = (runContext.wallet as any).pxe;
+            if (pxe?.blockStateSynchronizer) {
+                await pxe.blockStateSynchronizer.blockStream?.stop();
+                await pxe.blockStateSynchronizer.store?.close();
+            }
+            await runContext.wallet.stop();
+            // Close leftover HTTP keep-alive sockets
+            for (const h of (process as any)._getActiveHandles()) {
+                if (h?.constructor?.name === 'Socket' && !h.destroyed) h.destroy();
+            }
+        }
+
         console.log(`--- Benchmark finished for ${contractName} ---`);
       } catch (error: any) {
         console.error(`Failed to run benchmark for ${contractName} from ${benchmarkFilePath}:`, error);
