@@ -1,7 +1,6 @@
 name: Pre-Release
 
 on:
-  pull_request: # TODO: Remove this before pushing to dev branch
   workflow_dispatch:
 
 permissions:
