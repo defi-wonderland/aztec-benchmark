@@ -129,7 +129,7 @@ program
           process.exit(1);
         }
 
-        const profiler = new Profiler(runContext.wallet, { skipProving: options.skipProving });
+        const profiler = new Profiler(runContext.wallet, { skipProving: options.skipProving, feePaymentMethod: runContext.feePaymentMethod });
 
         console.log(`Getting methods to benchmark for ${contractName}...`);
         const interactionsToBenchmark: Array<ContractFunctionInteractionCallIntent | NamedBenchmarkedInteraction> = benchmarkInstance.getMethods(runContext);
