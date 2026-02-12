@@ -149,6 +149,10 @@ program
           console.log(`Teardown complete for ${contractName}.`);
         }
 
+        if (runContext.wallet && typeof runContext.wallet.stop === 'function') {
+          await runContext.wallet.stop();
+        }
+
         console.log(`--- Benchmark finished for ${contractName} ---`);
       } catch (error: any) {
         console.error(`Failed to run benchmark for ${contractName} from ${benchmarkFilePath}:`, error);
