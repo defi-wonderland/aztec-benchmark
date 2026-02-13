@@ -178,28 +178,26 @@ export class Profiler {
     try {
       const origin = f.caller;
 
-      // Gas simulated is 10% higher by default, we set the padding to 0 to get a better estimate.
-      const gas: GasLimits = (await f.action.simulate({ from: origin, fee: { estimateGas: true, estimatedGasPadding: 0 } })).estimatedGas;
-      // We cannot send a profiled tx proof, so we skip proof generation. We still need to profile gate counts.
-      const profileResults = await f.action.profile({ profileMode: 'full', from: origin, skipProofGeneration: true });
-
-      let provingTime: number | undefined;
-
-      const sendFeeOpts = this.#feePaymentMethod
+      const feeOpts = this.#feePaymentMethod
         ? { paymentMethod: this.#feePaymentMethod }
         : undefined;
 
+      // Gas simulated is 10% higher by default, we set the padding to 0 to get a better estimate.
+      const gas: GasLimits = (await f.action.simulate({ from: origin, fee: { estimateGas: true, estimatedGasPadding: 0, ...feeOpts } })).estimatedGas;
+      // We cannot send a profiled tx proof, so we skip proof generation. We still need to profile gate counts.
+      const profileResults = await f.action.profile({ profileMode: 'full', from: origin, skipProofGeneration: true, fee: feeOpts });
+
+      let provingTime: number | undefined;
+
       if (!this.#skipProving && this.#wallet) {
         // We prove the tx to get the proving time.
-        const provenTx = await proveInteraction(this.#wallet, f.action, { from: f.caller, fee: sendFeeOpts });
+        const provenTx = await proveInteraction(this.#wallet, f.action, { from: f.caller, fee: feeOpts });
         // We send the tx. We could get the gas used from the receipt.
-        // In Aztec v4, send() returns Promise<TxReceipt> directly, no need for .wait()
         await provenTx.send();
         provingTime = provenTx.stats?.timings?.proving;
       } else {
         // We send the tx. We could get the gas used from the receipt.
-        // In Aztec v4, send() returns Promise<TxReceipt> directly, no need for .wait()
-        await f.action.send({ from: origin, fee: sendFeeOpts });
+        await f.action.send({ from: origin, fee: feeOpts });
       }
 
       const result: ProfileResult = {
