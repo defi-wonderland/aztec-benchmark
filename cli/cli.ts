@@ -129,7 +129,7 @@ program
           process.exit(1);
         }
 
-        const profiler = new Profiler(runContext.wallet, { skipProving: options.skipProving });
+        const profiler = new Profiler(runContext.wallet, { skipProving: options.skipProving, feePaymentMethod: runContext.feePaymentMethod });
 
         console.log(`Getting methods to benchmark for ${contractName}...`);
         const interactionsToBenchmark: Array<ContractFunctionInteractionCallIntent | NamedBenchmarkedInteraction> = benchmarkInstance.getMethods(runContext);
@@ -147,6 +147,21 @@ program
           console.log(`Running teardown for ${contractName}...`);
           await benchmarkInstance.teardown(runContext);
           console.log(`Teardown complete for ${contractName}.`);
+        }
+
+        // Workaround: PXE.stop() doesn't release all resources
+        // @see https://github.com/AztecProtocol/aztec-packages/issues/20446
+        if (runContext.wallet) {
+            const pxe = (runContext.wallet as any).pxe;
+            if (pxe?.blockStateSynchronizer) {
+                await pxe.blockStateSynchronizer.blockStream?.stop();
+                await pxe.blockStateSynchronizer.store?.close();
+            }
+            await runContext.wallet.stop();
+            // Close leftover HTTP keep-alive sockets
+            for (const h of (process as any)._getActiveHandles()) {
+                if (h?.constructor?.name === 'Socket' && !h.destroyed) h.destroy();
+            }
         }
 
         console.log(`--- Benchmark finished for ${contractName} ---`);
