@@ -23,6 +23,14 @@ on:
         description: "Suffix for PR benchmark files"
         type: string
         default: "_new"
+      baseline-workflow:
+        description: "Workflow filename that produces baselines for default branches"
+        type: string
+        default: "update-baseline.yml"
+      pr-workflow:
+        description: "Workflow filename that produces baselines for non-default branches"
+        type: string
+        default: "pr-checks.yml"
 
 permissions:
   pull-requests: write
@@ -33,6 +41,8 @@ env:
   BENCH_DIR: ${{ inputs.bench-dir }}
   CURRENT_SUFFIX: ${{ inputs.current-suffix }}
   PR_SUFFIX: ${{ inputs.pr-suffix }}
+  BASELINE_WORKFLOW: ${{ inputs.baseline-workflow }}
+  PR_WORKFLOW: ${{ inputs.pr-workflow }}
 
 jobs:
   benchmark:
@@ -63,9 +73,9 @@ jobs:
           encoded=$(echo "${BASE_REF}" | sed 's/\//-/g')
           echo "base-ref-encoded=${encoded}" >> $GITHUB_OUTPUT
           if [[ "${BASE_REF}" == "dev" || "${BASE_REF}" == "main" ]]; then
-            echo "workflow=update-baseline.yml" >> $GITHUB_OUTPUT
+            echo "workflow=${BASELINE_WORKFLOW}" >> $GITHUB_OUTPUT
           else
-            echo "workflow=pr-checks.yml" >> $GITHUB_OUTPUT
+            echo "workflow=${PR_WORKFLOW}" >> $GITHUB_OUTPUT
           fi
 
       - name: Download baseline artifact
