@@ -15,6 +15,14 @@ on:
         description: "Directory for benchmark files"
         type: string
         default: "./benchmarks"
+      current-suffix:
+        description: "Suffix for baseline benchmark files"
+        type: string
+        default: "_latest"
+      pr-suffix:
+        description: "Suffix for PR benchmark files"
+        type: string
+        default: "_new"
 
 permissions:
   pull-requests: write
@@ -23,6 +31,8 @@ permissions:
 
 env:
   BENCH_DIR: ${{ inputs.bench-dir }}
+  CURRENT_SUFFIX: ${{ inputs.current-suffix }}
+  PR_SUFFIX: ${{ inputs.pr-suffix }}
 
 jobs:
   benchmark:
@@ -43,7 +53,7 @@ jobs:
           run-codegen: "true"
 
       - name: Run benchmarks
-        run: yarn aztec-benchmark --suffix _new --output-dir ${{ env.BENCH_DIR }}
+        run: yarn aztec-benchmark --suffix "$PR_SUFFIX" --output-dir "$BENCH_DIR"
 
       - name: Encode base branch name
         id: encode-base
@@ -72,14 +82,12 @@ jobs:
       - name: Generate comparison report
         run: |
           node -e "
-            const { runComparison } = require(
-              require.resolve('@defi-wonderland/aztec-benchmark/action/comparison.cjs')
-            );
+            const { runComparison } = require('@defi-wonderland/aztec-benchmark/action/comparison.cjs');
             const fs = require('fs');
             const result = runComparison({
-              reportsDir: '${{ env.BENCH_DIR }}',
-              baseSuffix: '_latest',
-              prSuffix: '_new',
+              reportsDir: process.env.BENCH_DIR,
+              baseSuffix: process.env.CURRENT_SUFFIX,
+              prSuffix: process.env.PR_SUFFIX,
               threshold: 2.5
             });
             fs.writeFileSync('benchmark-comparison.md', result);
@@ -93,9 +101,9 @@ jobs:
 
       - name: Rename to baseline format
         run: |
-          rm -f ${{ env.BENCH_DIR }}/*_latest.benchmark.json
-          for file in ${{ env.BENCH_DIR }}/*_new.benchmark.json; do
-            [ -f "$file" ] && mv "$file" "${file/_new.benchmark.json/_latest.benchmark.json}"
+          rm -f "$BENCH_DIR"/*"$CURRENT_SUFFIX".benchmark.json
+          for file in "$BENCH_DIR"/*"$PR_SUFFIX".benchmark.json; do
+            [ -f "$file" ] && mv "$file" "${file/${PR_SUFFIX}.benchmark.json/${CURRENT_SUFFIX}.benchmark.json}"
           done
 
       - name: Encode head branch name
@@ -110,6 +118,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-baseline-${{ steps.encode-head.outputs.head-ref-encoded }}
-          path: ${{ env.BENCH_DIR }}/*_latest.benchmark.json
+          path: ${{ env.BENCH_DIR }}/*${{ env.CURRENT_SUFFIX }}.benchmark.json
           retention-days: 90
           if-no-files-found: error

@@ -15,6 +15,10 @@ on:
         description: "Directory for benchmark files"
         type: string
         default: "./benchmarks"
+      current-suffix:
+        description: "Suffix for benchmark report files"
+        type: string
+        default: "_latest"
 
 permissions:
   contents: read
@@ -22,6 +26,7 @@ permissions:
 
 env:
   BENCH_DIR: ${{ inputs.bench-dir }}
+  BENCH_SUFFIX: ${{ inputs.current-suffix }}
 
 jobs:
   update-baseline:
@@ -41,14 +46,14 @@ jobs:
           run-codegen: "true"
 
       - name: Run benchmarks
-        run: yarn aztec-benchmark --suffix _latest --output-dir ${{ env.BENCH_DIR }}
+        run: yarn aztec-benchmark --suffix "$BENCH_SUFFIX" --output-dir "$BENCH_DIR"
 
       - name: List baseline files
         env:
           BRANCH_NAME: ${{ github.ref_name }}
         run: |
           echo "Baseline files for branch: ${BRANCH_NAME}"
-          ls -lh ${{ env.BENCH_DIR }}/*_latest.benchmark.json
+          ls -lh "$BENCH_DIR"/*"$BENCH_SUFFIX".benchmark.json
 
       - name: Encode branch name
         id: encode
@@ -62,6 +67,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-baseline-${{ steps.encode.outputs.branch-encoded }}
-          path: ${{ env.BENCH_DIR }}/*_latest.benchmark.json
+          path: ${{ env.BENCH_DIR }}/*${{ env.BENCH_SUFFIX }}.benchmark.json
           retention-days: 90
           if-no-files-found: error
