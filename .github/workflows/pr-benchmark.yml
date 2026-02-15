@@ -47,10 +47,12 @@ jobs:
 
       - name: Encode base branch name
         id: encode-base
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          encoded=$(echo "${{ github.event.pull_request.base.ref }}" | sed 's/\//-/g')
+          encoded=$(echo "${BASE_REF}" | sed 's/\//-/g')
           echo "base-ref-encoded=${encoded}" >> $GITHUB_OUTPUT
-          if [[ "${{ github.event.pull_request.base.ref }}" == "dev" || "${{ github.event.pull_request.base.ref }}" == "main" ]]; then
+          if [[ "${BASE_REF}" == "dev" || "${BASE_REF}" == "main" ]]; then
             echo "workflow=update-baseline.yml" >> $GITHUB_OUTPUT
           else
             echo "workflow=pr-checks.yml" >> $GITHUB_OUTPUT
@@ -98,8 +100,10 @@ jobs:
 
       - name: Encode head branch name
         id: encode-head
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
-          encoded=$(echo "${{ github.event.pull_request.head.ref }}" | sed 's/\//-/g')
+          encoded=$(echo "${HEAD_REF}" | sed 's/\//-/g')
           echo "head-ref-encoded=${encoded}" >> $GITHUB_OUTPUT
 
       - name: Upload baseline
