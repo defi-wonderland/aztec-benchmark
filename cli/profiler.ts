@@ -1,4 +1,5 @@
 import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
+import type { FeePaymentMethod } from '@aztec/aztec.js/fee';
 import { proveInteraction } from '@aztec/test-wallet/server';
 import { TestWallet } from '@aztec/test-wallet/server';
 
@@ -32,6 +33,8 @@ function sumGas(gas: Gas): number {
 
 interface ProfilerOptions {
   skipProving?: boolean;
+  /** Fee payment method to use when sending transactions. */
+  feePaymentMethod?: FeePaymentMethod;
 }
 
 /**
@@ -40,10 +43,12 @@ interface ProfilerOptions {
 export class Profiler {
   #wallet?: TestWallet;
   #skipProving: boolean;
+  #feePaymentMethod?: FeePaymentMethod;
 
   constructor(wallet?: TestWallet, options?: ProfilerOptions) {
     this.#wallet = wallet;
     this.#skipProving = options?.skipProving ?? false;
+    this.#feePaymentMethod = options?.feePaymentMethod;
     
     if (!this.#skipProving && !wallet) {
       throw new Error('Wallet is required when proving is enabled');
@@ -173,22 +178,26 @@ export class Profiler {
     try {
       const origin = f.caller;
 
+      const feeOpts = this.#feePaymentMethod
+        ? { paymentMethod: this.#feePaymentMethod }
+        : undefined;
+
       // Gas simulated is 10% higher by default, we set the padding to 0 to get a better estimate.
-      const gas: GasLimits = (await f.action.simulate({ from: origin, fee: { estimateGas: true, estimatedGasPadding: 0 } })).estimatedGas;
+      const gas: GasLimits = (await f.action.simulate({ from: origin, fee: { estimateGas: true, estimatedGasPadding: 0, ...feeOpts } })).estimatedGas;
       // We cannot send a profiled tx proof, so we skip proof generation. We still need to profile gate counts.
-      const profileResults = await f.action.profile({ profileMode: 'full', from: origin, skipProofGeneration: true });
+      const profileResults = await f.action.profile({ profileMode: 'full', from: origin, skipProofGeneration: true, fee: feeOpts });
 
       let provingTime: number | undefined;
 
       if (!this.#skipProving && this.#wallet) {
         // We prove the tx to get the proving time.
-        const provenTx = await proveInteraction(this.#wallet, f.action, { from: f.caller });
+        const provenTx = await proveInteraction(this.#wallet, f.action, { from: f.caller, fee: feeOpts });
         // We send the tx. We could get the gas used from the receipt.
-        await provenTx.send().wait();
+        await provenTx.send();
         provingTime = provenTx.stats?.timings?.proving;
       } else {
         // We send the tx. We could get the gas used from the receipt.
-        await f.action.send({ from: origin }).wait();
+        await f.action.send({ from: origin, fee: feeOpts });
       }
 
       const result: ProfileResult = {

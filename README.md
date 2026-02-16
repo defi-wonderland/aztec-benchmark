@@ -1,9 +1,9 @@
 # Aztec Benchmark
 [![npm version](https://badge.fury.io/js/%40defi-wonderland%2Faztec-benchmark.svg)](https://www.npmjs.com/package/@defi-wonderland/aztec-benchmark)
 
-**CLI tool for running Aztec contract benchmarks.**
+**CLI tool and reusable CI workflows for running Aztec contract benchmarks.**
 
-Use this tool to execute benchmark files written in TypeScript. For comparing results and generating reports in CI, use the separate companion GitHub Action: [`defi-wonderland/aztec-benchmark`](https://github.com/defi-wonderland/aztec-benchmark).
+Use the CLI to execute benchmark files written in TypeScript. For CI integration, this repository provides **reusable GitHub workflows** that handle the full benchmark-and-compare cycle — including environment setup, baseline management, and PR commenting — so consumer repos can integrate with a single `uses:` line.
 
 ## Table of Contents
 
@@ -14,10 +14,13 @@ Use this tool to execute benchmark files written in TypeScript. For comparing re
   - [Examples](#examples)
 - [Writing Benchmarks](#writing-benchmarks)
 - [Benchmark Output](#benchmark-output)
-- [Action Usage](#action-usage)
+- [Reusable Workflows](#reusable-workflows)
+  - [PR Benchmark (`pr-benchmark.yml`)](#pr-benchmark-pr-benchmarkyml)
+  - [Update Baseline (`update-baseline.yml`)](#update-baseline-update-baselineyml)
+  - [How Baselines Work](#how-baselines-work)
+- [Action Usage (Advanced)](#action-usage-advanced)
   - [Inputs](#inputs)
   - [Outputs](#outputs)
-  - [Example Usage (in PR workflow)](#example-usage-in-pr-workflow)
 
 ---
 
@@ -85,6 +88,12 @@ Each entry in the array returned by `getMethods` can either be a plain `Contract
 (in which case the benchmark name is auto-derived) or a `NamedBenchmarkedInteraction` object 
 (which includes the `interaction` and a custom `name` for reporting).
 
+### Fee Payment
+
+By default, every benchmarked account must hold Fee Juice (FJ) to pay for transaction fees. If your accounts don't have pre-existing FJ (e.g. freshly-created accounts on sandbox), you can return a `feePaymentMethod` from `setup()` inside the `BenchmarkContext`. The profiler will pass it to every `send()` and `proveInteraction()` call automatically.
+
+The sandbox ships with a canonical `SponsoredFPC` contract that has FJ and can sponsor fees for any account — making it the easiest way to get benchmarks running without bridging from L1.
+
 ```ts
 import {
   Benchmark, // Alias for BenchmarkBase
@@ -95,6 +104,7 @@ import type { PXE } from '@aztec/pxe/server';
 import type { Contract } from '@aztec/aztec.js/contracts'; // Generic Contract type from Aztec.js
 import type { AztecAddress } from '@aztec/aztec.js/addresses';
 import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
+import type { FeePaymentMethod } from '@aztec/aztec.js/fee';
 import { createStore } from '@aztec/kv-store/lmdb-v2';
 import { createPXE, getPXEConfig } from '@aztec/pxe/server';
 import { createAztecNodeClient, waitForNode } from '@aztec/aztec.js/node';
@@ -107,6 +117,7 @@ interface MyBenchmarkContext extends BenchmarkContext {
   wallet: TestWallet;
   deployer: AztecAddress;
   contract: Contract; // Use the generic Contract type or your specific contract type
+  feePaymentMethod?: FeePaymentMethod;
 }
 
 export default class MyContractBenchmark extends Benchmark {
@@ -141,7 +152,21 @@ export default class MyContractBenchmark extends Benchmark {
     const contract = await YourSpecificContract.at(deployedContract.address, wallet);
     console.log('Contract deployed at:', contract.address.toString());
 
-    return { pxe, deployer, contract }; 
+    // Optional: use SponsoredFPC so accounts don't need pre-existing Fee Juice.
+    // The sandbox ships with a canonical SponsoredFPC pre-deployed at a deterministic address.
+    //
+    // import { SponsoredFeePaymentMethod } from '@aztec/aztec.js/fee/testing';
+    // import { SponsoredFPCContract } from '@aztec/noir-contracts.js/SponsoredFPC';
+    // import { getContractInstanceFromInstantiationParams } from '@aztec/aztec.js/contracts';
+    //
+    // const instance = await getContractInstanceFromInstantiationParams(
+    //   SponsoredFPCContract.artifact,
+    //   { salt: new Fr(0n) },
+    // );
+    // await wallet.registerContract(instance, SponsoredFPCContract.artifact);
+    // const feePaymentMethod = new SponsoredFeePaymentMethod(instance.address);
+
+    return { pxe, wallet, deployer, contract /*, feePaymentMethod */ }; 
   }
 
   // Returns an array of interactions to benchmark. 
@@ -186,6 +211,7 @@ export default class MyContractBenchmark extends Benchmark {
 Your `BenchmarkBase` implementation is responsible for constructing the `ContractFunctionInteractionCallIntent` objects.
 If you provide a `NamedBenchmarkedInteraction` object, its `name` field will be used in reports. 
 If you provide a plain `ContractFunctionInteractionCallIntent`, the tool will attempt to derive a name from the interaction (e.g., the method name).
+If you return a `feePaymentMethod` in the `BenchmarkContext`, it is automatically passed to every transaction the profiler sends — no changes to `getMethods` are needed.
 
 ### Wonderland's Usage Example
 
@@ -198,11 +224,106 @@ You can find how we use this tool for benchmarking our Aztec contracts in [`azte
 Your `BenchmarkBase` implementation is responsible for measuring and outputting performance data (e.g., as JSON). The comparison action uses this output.
 Each entry in the output will be identified by the custom `name` you provided (if any) or the auto-derived name.
 
---- 
+---
 
-## Action Usage
+## Reusable Workflows
 
-This repository includes a GitHub Action (defined in `action/action.yml`) designed for CI workflows. It automatically finds and compares benchmark results (conventionally named with `_base` and `_latest` suffixes) generated by previous runs of `aztec-benchmark` and produces a Markdown comparison report.
+This repository ships two **reusable GitHub workflows** (`workflow_call`) that handle the full CI benchmark cycle. Consumer repos call them with a single `uses:` line — no need to copy workflow YAML or wire up artifact management manually.
+
+### PR Benchmark (`pr-benchmark.yml`)
+
+Runs benchmarks on the PR head, downloads the baseline from the base branch, generates a comparison report, comments it on the PR, and uploads the new results as a baseline artifact for the PR branch.
+
+**Usage:**
+
+```yaml
+# .github/workflows/pr-checks.yml
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  benchmark:
+    uses: defi-wonderland/aztec-benchmark/.github/workflows/pr-benchmark.yml@v0
+    permissions:
+      pull-requests: write
+      issues: write
+      actions: read
+```
+
+**Inputs:**
+
+| Input | Type | Default | Description |
+|---|---|---|---|
+| `runner` | `string` | `ubuntu-latest-m` | GitHub runner label |
+| `timeout` | `number` | `120` | Job timeout in minutes |
+| `bench-dir` | `string` | `./benchmarks` | Directory for benchmark files |
+
+**With custom inputs:**
+
+```yaml
+jobs:
+  benchmark:
+    uses: defi-wonderland/aztec-benchmark/.github/workflows/pr-benchmark.yml@v0
+    permissions:
+      pull-requests: write
+      issues: write
+      actions: read
+    with:
+      runner: ubuntu-latest-l
+      timeout: 180
+      bench-dir: ./my-benchmarks
+```
+
+### Update Baseline (`update-baseline.yml`)
+
+Runs benchmarks on the current branch and uploads the results as a baseline artifact. This should be triggered on pushes to your default branches so that PR benchmarks have a baseline to compare against.
+
+**Usage:**
+
+```yaml
+# .github/workflows/update-baseline.yml
+name: Update Baseline
+
+on:
+  push:
+    branches: [dev, main]
+
+jobs:
+  update-baseline:
+    uses: defi-wonderland/aztec-benchmark/.github/workflows/update-baseline.yml@v0
+    permissions:
+      contents: read
+      actions: write
+```
+
+**Inputs:**
+
+| Input | Type | Default | Description |
+|---|---|---|---|
+| `runner` | `string` | `ubuntu-latest-m` | GitHub runner label |
+| `timeout` | `number` | `120` | Job timeout in minutes |
+| `bench-dir` | `string` | `./benchmarks` | Directory for benchmark files |
+
+### How Baselines Work
+
+The workflows use GitHub Actions artifacts to store and retrieve baseline benchmark results:
+
+1. **`update-baseline.yml`** runs benchmarks with the `_latest` suffix and uploads the results as `benchmark-baseline-<branch>`.
+2. **`pr-benchmark.yml`** runs benchmarks with the `_new` suffix on the PR head, then downloads the `benchmark-baseline-<base-branch>` artifact to get the `_latest` files. It compares `_latest` (baseline) vs `_new` (PR) and comments a Markdown diff table on the PR.
+3. After comparison, the PR workflow renames `_new` files to `_latest` and uploads them as `benchmark-baseline-<head-branch>`, so stacked PRs can also compare against each other.
+
+Artifacts are retained for **90 days** by default.
+
+---
+
+## Action Usage (Advanced)
+
+> **Note:** For most projects, the [reusable workflows](#reusable-workflows) above are the recommended approach. The action below is a lower-level building block for projects that need a custom CI setup.
+
+This repository also includes a GitHub Action (defined in `action/action.yml`) that runs `aztec-benchmark` and compares results. It automatically finds benchmark reports (named with `_base` and `_latest` suffixes) and produces a Markdown comparison report.
 
 ### Inputs
 
@@ -213,47 +334,5 @@ This repository includes a GitHub Action (defined in `action/action.yml`) design
 
 - `comparison_markdown`: The generated Markdown report content.
 - `markdown_file_path`: Path to the saved Markdown file.
-
-### Example Usage (in PR workflow)
-
-This action is typically used in a workflow that runs on pull requests. It assumes a previous step or job has already run the benchmarks on the base commit and saved the results with the `_base` suffix (e.g., in `./benchmarks/token_base.benchmark.json`).
-
-**Workflow Steps:**
-1. Checkout the base branch/commit.
-2. Run `npx aztec-benchmark -s _base` (saving outputs to `./benchmarks`).
-3. Checkout the PR branch/current commit.
-4. Use this action (`./action`), which will:
-   a. Run `npx aztec-benchmark -s _latest` to generate current benchmarks.
-   b. Compare the new `_latest` files against the existing `_base` files.
-   c. Generate the Markdown report.
-
-```yaml
-# Example steps within a PR workflow job:
-
-# (Assume previous steps checked out base, ran benchmarks with _base suffix, 
-#  and artifacts/reports are available, potentially via actions/upload-artifact 
-#  and actions/download-artifact if run in separate jobs)
-
-- name: Checkout Current Code
-  uses: actions/checkout@v4
-
-# (Ensure Nargo.toml and benchmark dependencies are set up)
-- name: Install Dependencies
-  run: yarn install --frozen-lockfile
-
-- name: Generate Latest Benchmarks, Compare, and Create Report
-  # This action runs 'aztec-benchmark -s _latest' internally
-  uses: defi-wonderland/aztec-benchmark-diff/action 
-  id: benchmark_compare
-  with:
-    threshold: '2.0' # Optional threshold
-    output_markdown_path: 'benchmark_diff.md' # Optional output path
-
-- name: Comment Report on PR
-  uses: peter-evans/create-or-update-comment@v4
-  with:
-    issue-number: ${{ github.event.pull_request.number }}
-    body-file: ${{ steps.benchmark_compare.outputs.markdown_file_path }}
-```
 
 Refer to the `action/action.yml` file for the definitive inputs and description.
