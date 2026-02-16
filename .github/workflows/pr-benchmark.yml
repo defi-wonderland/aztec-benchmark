@@ -1,0 +1,147 @@
+name: PR Benchmark
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: "GitHub runner label"
+        type: string
+        default: "ubuntu-latest-m"
+      timeout:
+        description: "Job timeout in minutes"
+        type: number
+        default: 120
+      bench-dir:
+        description: "Directory for benchmark files"
+        type: string
+        default: "./benchmarks"
+      current-suffix:
+        description: "Suffix for baseline benchmark files"
+        type: string
+        default: "_latest"
+      pr-suffix:
+        description: "Suffix for PR benchmark files"
+        type: string
+        default: "_new"
+      baseline-workflow:
+        description: "Workflow filename that produces baselines for default branches"
+        type: string
+        default: "update-baseline.yml"
+      pr-workflow:
+        description: "Workflow filename that produces baselines for non-default branches"
+        type: string
+        default: "pr-checks.yml"
+
+permissions:
+  pull-requests: write
+  issues: write
+  actions: read
+
+env:
+  BENCH_DIR: ${{ inputs.bench-dir }}
+  CURRENT_SUFFIX: ${{ inputs.current-suffix }}
+  PR_SUFFIX: ${{ inputs.pr-suffix }}
+  BASELINE_WORKFLOW: ${{ inputs.baseline-workflow }}
+  PR_WORKFLOW: ${{ inputs.pr-workflow }}
+
+jobs:
+  benchmark:
+    name: Benchmark
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.timeout }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Setup Aztec environment
+        uses: defi-wonderland/aztec-ci-actions/actions/setup-aztec@v0
+        with:
+          start-pxe: "true"
+          run-codegen: "true"
+
+      - name: Run benchmarks
+        run: yarn aztec-benchmark --suffix "$PR_SUFFIX" --output-dir "$BENCH_DIR"
+
+      - name: Encode base branch name
+        id: encode-base
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          encoded=$(echo "${BASE_REF}" | sed 's/\//-/g')
+          echo "base-ref-encoded=${encoded}" >> $GITHUB_OUTPUT
+          if [[ "${BASE_REF}" == "dev" || "${BASE_REF}" == "main" ]]; then
+            echo "workflow=${BASELINE_WORKFLOW}" >> $GITHUB_OUTPUT
+          else
+            echo "workflow=${PR_WORKFLOW}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download baseline artifact
+        id: download-baseline
+        continue-on-error: true
+        uses: dawidd6/action-download-artifact@0bd50d53a6d7fb5cb921e607957e9cc12b4ce392 # v12
+        with:
+          workflow: ${{ steps.encode-base.outputs.workflow }}
+          branch: ${{ github.event.pull_request.base.ref }}
+          name: benchmark-baseline-${{ steps.encode-base.outputs.base-ref-encoded }}
+          path: ${{ env.BENCH_DIR }}
+          if_no_artifact_found: warn
+
+      # Requires @defi-wonderland/aztec-benchmark to be installed in the consuming repo
+      # (e.g. via yarn add -D @defi-wonderland/aztec-benchmark).
+      - name: Generate comparison report
+        run: |
+          node -e "
+            let runComparison;
+            try {
+              ({ runComparison } = require('@defi-wonderland/aztec-benchmark/action/comparison.cjs'));
+            } catch (e) {
+              if (e.code === 'MODULE_NOT_FOUND') {
+                console.error(
+                  'ERROR: @defi-wonderland/aztec-benchmark is not installed.\n' +
+                  'Add it as a dev-dependency (yarn add -D @defi-wonderland/aztec-benchmark) ' +
+                  'and make sure dependencies are installed before this step.'
+                );
+              }
+              throw e;
+            }
+            const fs = require('fs');
+            const result = runComparison({
+              reportsDir: process.env.BENCH_DIR,
+              baseSuffix: process.env.CURRENT_SUFFIX,
+              prSuffix: process.env.PR_SUFFIX,
+              threshold: 2.5
+            });
+            fs.writeFileSync('benchmark-comparison.md', result);
+          "
+
+      - name: Comment diff on PR
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: benchmark-comparison.md
+
+      - name: Rename to baseline format
+        run: |
+          rm -f "$BENCH_DIR"/*"$CURRENT_SUFFIX".benchmark.json
+          for file in "$BENCH_DIR"/*"$PR_SUFFIX".benchmark.json; do
+            [ -f "$file" ] && mv "$file" "${file/${PR_SUFFIX}.benchmark.json/${CURRENT_SUFFIX}.benchmark.json}"
+          done
+
+      - name: Encode head branch name
+        id: encode-head
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          encoded=$(echo "${HEAD_REF}" | sed 's/\//-/g')
+          echo "head-ref-encoded=${encoded}" >> $GITHUB_OUTPUT
+
+      - name: Upload baseline
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-baseline-${{ steps.encode-head.outputs.head-ref-encoded }}
+          path: ${{ env.BENCH_DIR }}/*${{ env.CURRENT_SUFFIX }}.benchmark.json
+          retention-days: 90
+          if-no-files-found: error
