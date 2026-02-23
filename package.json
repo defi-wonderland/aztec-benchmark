@@ -1,6 +1,6 @@
 {
   "name": "@defi-wonderland/aztec-benchmark",
-  "version": "4.0.0-devnet.2-patch.0",
+  "version": "4.0.0-devnet.2-patch.1",
   "description": "CLI tool and GitHub Action for Aztec contract benchmarking",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
