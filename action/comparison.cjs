@@ -162,7 +162,7 @@ function generateCircuitBreakdownSection(comparison, sortedNames, contractName) 
 
   const lines = [
     '<details>',
-    `<summary>${contractName} details</summary>`,
+    `<summary>🔎 ${contractName} circuit details</summary>`,
     '',
   ];
 
@@ -170,40 +170,18 @@ function generateCircuitBreakdownSection(comparison, sortedNames, contractName) 
     const gc = comparison[funcName]?.gateCounts;
     if (!gc || (gc.main.length === 0 && gc.pr.length === 0)) continue;
 
-    // Match circuits by name (with occurrence index for duplicates like private_kernel_inner).
-    // Build keyed maps: "circuitName#occurrence" -> gateCount
-    const buildMap = (counts) => {
-      const map = new Map();
-      const seen = {};
-      for (const entry of counts) {
-        const occ = (seen[entry.circuitName] || 0);
-        seen[entry.circuitName] = occ + 1;
-        map.set(`${entry.circuitName}#${occ}`, entry.gateCount);
-      }
-      return map;
-    };
-
-    const mainMap = buildMap(gc.main);
-    const prMap = buildMap(gc.pr);
-    const allKeys = [...new Set([...mainMap.keys(), ...prMap.keys()])];
-
     lines.push(
-      `<h4><code>${funcName}</code></h4>`,
+      `#### \`${funcName}\``,
       '',
-      '<table>',
-      '<tr><th>#</th><th>Circuit</th><th>Base Gates</th><th>PR Gates</th><th>Diff</th></tr>',
+      '| Circuit | Gates |',
+      '|---------|---:|',
     );
 
-    for (let i = 0; i < allKeys.length; i++) {
-      const key = allKeys[i];
-      const circuitName = key.substring(0, key.lastIndexOf('#'));
-      const mainGates = mainMap.get(key) ?? 0;
-      const prGates = prMap.get(key) ?? 0;
-      const diff = formatDiff(mainGates, prGates);
-      lines.push(`<tr><td>${i + 1}</td><td><code>${circuitName}</code></td><td align="right">${mainGates.toLocaleString()}</td><td align="right">${prGates.toLocaleString()}</td><td align="right">${diff}</td></tr>`);
+    for (const entry of gc.pr) {
+      lines.push(`| \`${entry.circuitName}\` | ${entry.gateCount.toLocaleString()} |`);
     }
 
-    lines.push('</table>', '');
+    lines.push('');
   }
 
   lines.push('</details>');
@@ -280,30 +258,8 @@ function generateContractComparisonTable(pair, threshold) {
   const output = [
     '<table>',
     '<thead>',
-    '<tr>',
-    '  <th></th>',
-    '  <th>Function</th>',
-    '  <th colspan="3">Gates</th>',
-    '  <th colspan="3">DA Gas</th>',
-    '  <th colspan="3">L2 Gas</th>',
-    '  <th colspan="3">Proving Time (ms)</th>',
-    '</tr>',
-    '<tr>',
-    '  <th>Status</th>',
-    '  <th></th>',
-    '  <th>Base</th>',
-    '  <th>PR</th>',
-    '  <th>Diff</th>',
-    '  <th>Base</th>',
-    '  <th>PR</th>',
-    '  <th>Diff</th>',
-    '  <th>Base</th>',
-    '  <th>PR</th>',
-    '  <th>Diff</th>',
-    '  <th>Base</th>',
-    '  <th>PR</th>',
-    '  <th>Diff</th>',
-    '</tr>',
+    '<tr><th></th><th>Function</th><th colspan="3">Gates</th><th colspan="3">DA Gas</th><th colspan="3">L2 Gas</th><th colspan="3">Proving Time (ms)</th></tr>',
+    '<tr><th></th><th></th><th>Base</th><th>PR</th><th>Diff</th><th>Base</th><th>PR</th><th>Diff</th><th>Base</th><th>PR</th><th>Diff</th><th>Base</th><th>PR</th><th>Diff</th></tr>',
     '</thead>',
     '<tbody>',
   ];
@@ -319,28 +275,10 @@ function generateContractComparisonTable(pair, threshold) {
     if (!metrics) continue;
 
     const statusEmoji = getStatusEmoji(metrics, threshold);
-    output.push(
-      '<tr>',
-      `  <td align="center">${statusEmoji}</td>`,
-      `  <td><code>${funcName}</code></td>`,
-      // Gates
-      `  <td align="right">${metrics.gates.main.toLocaleString()}</td>`,
-      `  <td align="right">${metrics.gates.pr.toLocaleString()}</td>`,
-      `  <td align="right">${formatDiff(metrics.gates.main, metrics.gates.pr)}</td>`,
-      // DA Gas
-      `  <td align="right">${metrics.daGas.main.toLocaleString()}</td>`,
-      `  <td align="right">${metrics.daGas.pr.toLocaleString()}</td>`,
-      `  <td align="right">${formatDiff(metrics.daGas.main, metrics.daGas.pr)}</td>`,
-      // L2 Gas
-      `  <td align="right">${metrics.l2Gas.main.toLocaleString()}</td>`,
-      `  <td align="right">${metrics.l2Gas.pr.toLocaleString()}</td>`,
-      `  <td align="right">${formatDiff(metrics.l2Gas.main, metrics.l2Gas.pr)}</td>`,
-      // Proving Time
-      `  <td align="right">${metrics.provingTime.main > 0 ? Math.round(metrics.provingTime.main).toLocaleString() : 'N/A'}</td>`,
-      `  <td align="right">${metrics.provingTime.pr > 0 ? Math.round(metrics.provingTime.pr).toLocaleString() : 'N/A'}</td>`,
-      `  <td align="right">${formatDiff(Math.round(metrics.provingTime.main), Math.round(metrics.provingTime.pr))}</td>`,
-      '</tr>',
-    );
+    const ptMain = metrics.provingTime.main > 0 ? Math.round(metrics.provingTime.main).toLocaleString() : 'N/A';
+    const ptPr = metrics.provingTime.pr > 0 ? Math.round(metrics.provingTime.pr).toLocaleString() : 'N/A';
+    const ptDiff = formatDiff(Math.round(metrics.provingTime.main), Math.round(metrics.provingTime.pr));
+    output.push(`<tr><td>${statusEmoji}</td><td><code>${funcName}</code></td><td>${metrics.gates.main.toLocaleString()}</td><td>${metrics.gates.pr.toLocaleString()}</td><td>${formatDiff(metrics.gates.main, metrics.gates.pr)}</td><td>${metrics.daGas.main.toLocaleString()}</td><td>${metrics.daGas.pr.toLocaleString()}</td><td>${formatDiff(metrics.daGas.main, metrics.daGas.pr)}</td><td>${metrics.l2Gas.main.toLocaleString()}</td><td>${metrics.l2Gas.pr.toLocaleString()}</td><td>${formatDiff(metrics.l2Gas.main, metrics.l2Gas.pr)}</td><td>${ptMain}</td><td>${ptPr}</td><td>${ptDiff}</td></tr>`);
 
   }
 
