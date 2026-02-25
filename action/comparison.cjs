@@ -258,8 +258,30 @@ function generateContractComparisonTable(pair, threshold) {
   const output = [
     '<table>',
     '<thead>',
-    '<tr><th></th><th>Function</th><th colspan="3">Gates</th><th colspan="3">DA Gas</th><th colspan="3">L2 Gas</th><th colspan="3">Proving Time (ms)</th></tr>',
-    '<tr><th></th><th></th><th>Base</th><th>PR</th><th>Diff</th><th>Base</th><th>PR</th><th>Diff</th><th>Base</th><th>PR</th><th>Diff</th><th>Base</th><th>PR</th><th>Diff</th></tr>',
+    '<tr>',
+      '<th></th>',
+      '<th>Function</th>',
+      '<th colspan="3">Gates</th>',
+      '<th colspan="3">DA Gas</th>',
+      '<th colspan="3">L2 Gas</th>',
+      '<th colspan="3">Proving Time (ms)</th>',
+    '</tr>',
+    '<tr>',
+      '<th></th>',
+      '<th></th>',
+      '<th>Base</th>',
+      '<th>PR</th>',
+      '<th>Diff</th>',
+      '<th>Base</th>',
+      '<th>PR</th>',
+      '<th>Diff</th>',
+      '<th>Base</th>',
+      '<th>PR</th>',
+      '<th>Diff</th>',
+      '<th>Base</th>',
+      '<th>PR</th>',
+      '<th>Diff</th>',
+    '</tr>',
     '</thead>',
     '<tbody>',
   ];
@@ -278,7 +300,28 @@ function generateContractComparisonTable(pair, threshold) {
     const ptMain = metrics.provingTime.main > 0 ? Math.round(metrics.provingTime.main).toLocaleString() : 'N/A';
     const ptPr = metrics.provingTime.pr > 0 ? Math.round(metrics.provingTime.pr).toLocaleString() : 'N/A';
     const ptDiff = formatDiff(Math.round(metrics.provingTime.main), Math.round(metrics.provingTime.pr));
-    output.push(`<tr><td>${statusEmoji}</td><td><code>${funcName}</code></td><td>${metrics.gates.main.toLocaleString()}</td><td>${metrics.gates.pr.toLocaleString()}</td><td>${formatDiff(metrics.gates.main, metrics.gates.pr)}</td><td>${metrics.daGas.main.toLocaleString()}</td><td>${metrics.daGas.pr.toLocaleString()}</td><td>${formatDiff(metrics.daGas.main, metrics.daGas.pr)}</td><td>${metrics.l2Gas.main.toLocaleString()}</td><td>${metrics.l2Gas.pr.toLocaleString()}</td><td>${formatDiff(metrics.l2Gas.main, metrics.l2Gas.pr)}</td><td>${ptMain}</td><td>${ptPr}</td><td>${ptDiff}</td></tr>`);
+    output.push(
+      '<tr>',
+        `<td align="center">${statusEmoji}</td>`,
+        `<td><code>${funcName}</code></td>`,
+      // Gates
+        `<td align="right">${metrics.gates.main.toLocaleString()}</td>`,
+        `<td align="right">${metrics.gates.pr.toLocaleString()}</td>`,
+        `<td align="right">${formatDiff(metrics.gates.main, metrics.gates.pr)}</td>`,
+      // DA Gas
+        `<td align="right">${metrics.daGas.main.toLocaleString()}</td>`,
+        `<td align="right">${metrics.daGas.pr.toLocaleString()}</td>`,
+        `<td align="right">${formatDiff(metrics.daGas.main, metrics.daGas.pr)}</td>`,
+      // L2 Gas
+        `<td align="right">${metrics.l2Gas.main.toLocaleString()}</td>`,
+        `<td align="right">${metrics.l2Gas.pr.toLocaleString()}</td>`,
+        `<td align="right">${formatDiff(metrics.l2Gas.main, metrics.l2Gas.pr)}</td>`,
+      // Proving Time
+        `<td align="right">${ptMain}</td>`,
+        `<td align="right">${ptPr}</td>`,
+        `<td align="right">${ptDiff}</td>`,
+      '</tr>',
+    );
 
   }
 
