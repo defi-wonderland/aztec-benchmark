@@ -147,6 +147,70 @@ function findBenchmarkPairs(reportsDir, baseSuffix, prSuffix) {
 }
 
 /**
+ * Generates an expandable circuit breakdown section for all functions in a contract.
+ * Uses <details>/<summary> HTML for a collapsible view placed below the summary table.
+ * @param {object} comparison - The comparison object keyed by function name.
+ * @param {string[]} sortedNames - Sorted function names.
+ * @returns {string} HTML string with the expandable circuit breakdown, or empty string if no data.
+ */
+function generateCircuitBreakdownSection(comparison, sortedNames, contractName) {
+  const hasAnyCircuitData = sortedNames.some(name => {
+    const gc = comparison[name]?.gateCounts;
+    return gc && (gc.main.length > 0 || gc.pr.length > 0);
+  });
+  if (!hasAnyCircuitData) return '';
+
+  const lines = [
+    '<details>',
+    `<summary>${contractName} details</summary>`,
+    '',
+  ];
+
+  for (const funcName of sortedNames) {
+    const gc = comparison[funcName]?.gateCounts;
+    if (!gc || (gc.main.length === 0 && gc.pr.length === 0)) continue;
+
+    // Match circuits by name (with occurrence index for duplicates like private_kernel_inner).
+    // Build keyed maps: "circuitName#occurrence" -> gateCount
+    const buildMap = (counts) => {
+      const map = new Map();
+      const seen = {};
+      for (const entry of counts) {
+        const occ = (seen[entry.circuitName] || 0);
+        seen[entry.circuitName] = occ + 1;
+        map.set(`${entry.circuitName}#${occ}`, entry.gateCount);
+      }
+      return map;
+    };
+
+    const mainMap = buildMap(gc.main);
+    const prMap = buildMap(gc.pr);
+    const allKeys = [...new Set([...mainMap.keys(), ...prMap.keys()])];
+
+    lines.push(
+      `<h4><code>${funcName}</code></h4>`,
+      '',
+      '<table>',
+      '<tr><th>#</th><th>Circuit</th><th>Base Gates</th><th>PR Gates</th><th>Diff</th></tr>',
+    );
+
+    for (let i = 0; i < allKeys.length; i++) {
+      const key = allKeys[i];
+      const circuitName = key.substring(0, key.lastIndexOf('#'));
+      const mainGates = mainMap.get(key) ?? 0;
+      const prGates = prMap.get(key) ?? 0;
+      const diff = formatDiff(mainGates, prGates);
+      lines.push(`<tr><td>${i + 1}</td><td><code>${circuitName}</code></td><td align="right">${mainGates.toLocaleString()}</td><td align="right">${prGates.toLocaleString()}</td><td align="right">${diff}</td></tr>`);
+    }
+
+    lines.push('</table>', '');
+  }
+
+  lines.push('</details>');
+  return lines.join('\n');
+}
+
+/**
  * Generates an HTML table comparing benchmark results for a single contract.
  * Handles new contracts where baseJsonPath may be null (no base report exists).
  * @param {object} pair - An object containing contractName, baseJsonPath (or null), and prJsonPath.
@@ -209,6 +273,7 @@ function generateContractComparisonTable(pair, threshold) {
       daGas: { main: getDaGas(mainResult), pr: getDaGas(prResult) },
       l2Gas: { main: getL2Gas(mainResult), pr: getL2Gas(prResult) },
       provingTime: { main: getProvingTime(mainResult), pr: getProvingTime(prResult) },
+      gateCounts: { main: mainResult?.gateCounts ?? [], pr: prResult?.gateCounts ?? [] },
     };
   }
 
@@ -276,9 +341,17 @@ function generateContractComparisonTable(pair, threshold) {
       `  <td align="right">${formatDiff(Math.round(metrics.provingTime.main), Math.round(metrics.provingTime.pr))}</td>`,
       '</tr>',
     );
+
   }
 
   output.push('</tbody>', '</table>');
+
+  // Add expandable circuit breakdown section below the summary table
+  const circuitSection = generateCircuitBreakdownSection(comparison, sortedNames, contractName);
+  if (circuitSection) {
+    output.push('', circuitSection);
+  }
+
   return output.join('\n');
 };
 
