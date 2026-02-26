@@ -168,7 +168,7 @@ function generateCircuitBreakdownSection(comparison, sortedNames, contractName) 
 
   for (const funcName of sortedNames) {
     const gc = comparison[funcName]?.gateCounts;
-    if (!gc || (gc.main.length === 0 && gc.pr.length === 0)) continue;
+    if (!gc || gc.pr.length === 0) continue;
 
     lines.push(
       `#### \`${funcName}\``,
@@ -267,7 +267,7 @@ function generateContractComparisonTable(pair, threshold) {
       '<th colspan="3">Proving Time (ms)</th>',
     '</tr>',
     '<tr>',
-      '<th></th>',
+      '<th>Status</th>',
       '<th></th>',
       '<th>Base</th>',
       '<th>PR</th>',
