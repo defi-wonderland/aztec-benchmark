@@ -24,6 +24,7 @@ async function run() {
     const configPath = core.getInput('config_path');
     const reportsDir = core.getInput('reports_dir');
     const onlyReport = core.getInput('only_report') === 'true';
+    const circuitDetails = core.getInput('circuit_details') === 'true';
 
     core.info('--- Inputs ---');
     core.info(`Config Path: ${configPath}`);
@@ -33,6 +34,7 @@ async function run() {
     core.info(`Base Suffix: ${baseSuffix}`);
     core.info(`Current Suffix: ${currentSuffix}`);
     core.info(`Only report: ${onlyReport}`);
+    core.info(`Circuit details: ${circuitDetails}`);
 
     if (isNaN(threshold)) {
       throw new Error('Invalid threshold value. Please provide a number.');
@@ -64,7 +66,8 @@ async function run() {
       reportsDir,
       baseSuffix,
       prSuffix: currentSuffix,
-      threshold
+      threshold,
+      circuitDetails
     };
     const markdownResult = runComparison(comparisonInputs);
     core.endGroup();

@@ -156,7 +156,7 @@ function findBenchmarkPairs(reportsDir, baseSuffix, prSuffix) {
 function generateCircuitBreakdownSection(comparison, sortedNames, contractName) {
   const hasAnyCircuitData = sortedNames.some(name => {
     const gc = comparison[name]?.gateCounts;
-    return gc && (gc.main.length > 0 || gc.pr.length > 0);
+    return gc && gc.pr.length > 0;
   });
   if (!hasAnyCircuitData) return '';
 
