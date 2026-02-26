@@ -31,6 +31,10 @@ on:
         description: "Workflow filename that produces baselines for non-default branches"
         type: string
         default: "pr-checks.yml"
+      circuit-details:
+        description: "Include per-circuit gate breakdown in the report"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -44,6 +48,7 @@ env:
   PR_SUFFIX: ${{ inputs.pr-suffix }}
   BASELINE_WORKFLOW: ${{ inputs.baseline-workflow }}
   PR_WORKFLOW: ${{ inputs.pr-workflow }}
+  CIRCUIT_DETAILS: ${{ inputs.circuit-details }}
 
 jobs:
   benchmark:
@@ -113,7 +118,8 @@ jobs:
               reportsDir: process.env.BENCH_DIR,
               baseSuffix: process.env.CURRENT_SUFFIX,
               prSuffix: process.env.PR_SUFFIX,
-              threshold: 2.5
+              threshold: 2.5,
+              circuitDetails: process.env.CIRCUIT_DETAILS !== 'false'
             });
             fs.writeFileSync('benchmark-comparison.md', result);
           "

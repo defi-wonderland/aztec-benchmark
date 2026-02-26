@@ -195,7 +195,7 @@ function generateCircuitBreakdownSection(comparison, sortedNames, contractName) 
  * @param {number} threshold - The percentage threshold for highlighting regressions.
  * @returns {string} An HTML string representing the comparison table, or an error message.
  */
-function generateContractComparisonTable(pair, threshold) {
+function generateContractComparisonTable(pair, threshold, { circuitDetails = false } = {}) {
   const { contractName, baseJsonPath, prJsonPath } = pair;
   const isNewContract = baseJsonPath === null;
   
@@ -259,7 +259,7 @@ function generateContractComparisonTable(pair, threshold) {
     '<table>',
     '<thead>',
     '<tr>',
-      '<th></th>',
+      '<th>🚦</th>',
       '<th>Function</th>',
       '<th colspan="3">Gates</th>',
       '<th colspan="3">DA Gas</th>',
@@ -267,7 +267,7 @@ function generateContractComparisonTable(pair, threshold) {
       '<th colspan="3">Proving Time (ms)</th>',
     '</tr>',
     '<tr>',
-      '<th>Status</th>',
+      '<th></th>',
       '<th></th>',
       '<th>Base</th>',
       '<th>PR</th>',
@@ -328,9 +328,11 @@ function generateContractComparisonTable(pair, threshold) {
   output.push('</tbody>', '</table>');
 
   // Add expandable circuit breakdown section below the summary table
-  const circuitSection = generateCircuitBreakdownSection(comparison, sortedNames, contractName);
-  if (circuitSection) {
-    output.push('', circuitSection);
+  if (circuitDetails) {
+    const circuitSection = generateCircuitBreakdownSection(comparison, sortedNames, contractName);
+    if (circuitSection) {
+      output.push('', circuitSection);
+    }
   }
 
   return output.join('\n');
@@ -347,7 +349,7 @@ function generateContractComparisonTable(pair, threshold) {
  * @returns {string} A markdown string containing the full comparison report.
  */
 function runComparison(inputs) {
-  const { reportsDir, baseSuffix, prSuffix, threshold } = inputs;
+  const { reportsDir, baseSuffix, prSuffix, threshold, circuitDetails = false } = inputs;
   console.log("Comparison script starting...");
   console.log(` Reports Dir: ${reportsDir} (expected ./benchmarks)`);
   console.log(` Base Suffix: '${baseSuffix}' (expected _base)`);
@@ -383,7 +385,7 @@ function runComparison(inputs) {
 
   for (const pair of benchmarkPairs) {
     console.log(`\nProcessing contract: ${pair.contractName}...`);
-    const tableMarkdown = generateContractComparisonTable(pair, threshold);
+    const tableMarkdown = generateContractComparisonTable(pair, threshold, { circuitDetails });
     markdownOutput.push(`## Contract: ${pair.contractName}\n`);
     markdownOutput.push(tableMarkdown);
     markdownOutput.push('\n');
