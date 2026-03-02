@@ -59,11 +59,11 @@ export class FeeWrappedInteraction {
       : this.inner.request(options);
   }
 
-  async simulate(options: SimulateInteractionOptions = {} as SimulateInteractionOptions) {
-    const { estimateGas, estimatedGasPadding, ...restFee } = options.fee ?? {};
+  async simulate(options?: SimulateInteractionOptions) {
+    const { estimateGas, estimatedGasPadding, ...restFee } = options?.fee ?? {};
     const adjusted = {
       ...options,
-      includeMetadata: estimateGas || options.includeMetadata,
+      includeMetadata: estimateGas || options?.includeMetadata,
       fee: {
         ...restFee,
         ...(estimatedGasPadding !== undefined && { estimatedGasPadding }),
@@ -72,23 +72,23 @@ export class FeeWrappedInteraction {
     return this.inner.simulate(this.withFee(adjusted) as unknown as SimulateInteractionOptions);
   }
 
-  async profile(options: ProfileInteractionOptions = {} as ProfileInteractionOptions) {
+  async profile(options?: ProfileInteractionOptions) {
     return this.inner.profile(this.withFee(options));
   }
 
-  async send(options: SendInteractionOptions = {} as SendInteractionOptions) {
+  async send(options?: SendInteractionOptions) {
     return this.inner.send(this.withFee(options));
   }
 
   private withFee<T extends SimulateInteractionOptions | ProfileInteractionOptions | SendInteractionOptions>(
-    options: T,
+    options?: T,
   ): T {
     const paymentMethod = options?.fee?.paymentMethod ?? this.paymentMethod;
-    if (!paymentMethod) return options;
+    if (!paymentMethod) return (options ?? {}) as T;
     return {
-      ...options,
+      ...(options ?? {}),
       fee: {
-        ...(options.fee ?? {}),
+        ...(options?.fee ?? {}),
         paymentMethod,
         ...(this.gasSettings && { gasSettings: this.gasSettings }),
       },
