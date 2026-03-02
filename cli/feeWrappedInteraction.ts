@@ -59,7 +59,7 @@ export class FeeWrappedInteraction {
       : this.inner.request(options);
   }
 
-  async simulate(options: SimulateInteractionOptions) {
+  async simulate(options: SimulateInteractionOptions = {} as SimulateInteractionOptions) {
     const { estimateGas, estimatedGasPadding, ...restFee } = options.fee ?? {};
     const adjusted = {
       ...options,
@@ -72,11 +72,11 @@ export class FeeWrappedInteraction {
     return this.inner.simulate(this.withFee(adjusted) as unknown as SimulateInteractionOptions);
   }
 
-  async profile(options: ProfileInteractionOptions) {
+  async profile(options: ProfileInteractionOptions = {} as ProfileInteractionOptions) {
     return this.inner.profile(this.withFee(options));
   }
 
-  async send(options: SendInteractionOptions) {
+  async send(options: SendInteractionOptions = {} as SendInteractionOptions) {
     return this.inner.send(this.withFee(options));
   }
 
