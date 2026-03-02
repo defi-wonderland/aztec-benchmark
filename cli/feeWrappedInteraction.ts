@@ -47,6 +47,9 @@ export class FeeWrappedInteraction {
   ) {}
 
   async request(options: RequestInteractionOptions = {}) {
+    // `RequestInteractionOptions.fee` is `FeePaymentMethodOption` — it only carries
+    // `paymentMethod`, not `gasSettings`. Gas settings are injected by `withFee` in
+    // simulate/profile/send where the fee type supports them.
     const paymentMethod = options?.fee?.paymentMethod ?? this.paymentMethod;
     return paymentMethod
       ? this.inner.request({
@@ -66,7 +69,7 @@ export class FeeWrappedInteraction {
         ...(estimatedGasPadding !== undefined && { estimatedGasPadding }),
       },
     } as SimulateInteractionOptions;
-    return this.inner.simulate(this.withFee(adjusted) as any);
+    return this.inner.simulate(this.withFee(adjusted) as unknown as SimulateInteractionOptions);
   }
 
   async profile(options: ProfileInteractionOptions) {
