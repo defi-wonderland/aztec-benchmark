@@ -50,7 +50,7 @@ export class FeeWrappedInteraction {
     // `RequestInteractionOptions.fee` is `FeePaymentMethodOption` — it only carries
     // `paymentMethod`, not `gasSettings`. Gas settings are injected by `withFee` in
     // simulate/profile/send where the fee type supports them.
-    const paymentMethod = options?.fee?.paymentMethod ?? this.paymentMethod;
+    const paymentMethod = options.fee?.paymentMethod ?? this.paymentMethod;
     return paymentMethod
       ? this.inner.request({
           ...options,
@@ -60,15 +60,15 @@ export class FeeWrappedInteraction {
   }
 
   async simulate(options?: SimulateInteractionOptions) {
-    const { estimateGas, estimatedGasPadding, ...restFee } = options?.fee ?? {};
+    const { estimateGas, ...restFee } = options?.fee ?? {};
     const adjusted = {
       ...options,
       includeMetadata: estimateGas || options?.includeMetadata,
-      fee: {
-        ...restFee,
-        ...(estimatedGasPadding !== undefined && { estimatedGasPadding }),
-      },
+      fee: restFee,
     } as SimulateInteractionOptions;
+    // Double cast needed: ContractFunctionInteraction.simulate has two overloads
+    // with a generic T extends SimulateInteractionOptions, and TypeScript cannot
+    // resolve which overload to apply when the argument is the base type.
     return this.inner.simulate(this.withFee(adjusted) as unknown as SimulateInteractionOptions);
   }
 
