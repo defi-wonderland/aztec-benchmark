@@ -30,6 +30,10 @@ inputs:
     description: 'If true, skips executing the aztec-benchmark CLI and just runs the comparison.'
     required: false
     default: 'false'
+  circuit_details:
+    description: 'If true, includes per-circuit gate count breakdown in an expandable section below each contract table.'
+    required: false
+    default: 'false'
 outputs:
   comparison_markdown:
     description: "The generated comparison report in Markdown format."
