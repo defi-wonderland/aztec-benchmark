@@ -119,7 +119,7 @@ jobs:
               baseSuffix: process.env.CURRENT_SUFFIX,
               prSuffix: process.env.PR_SUFFIX,
               threshold: 2.5,
-              circuitDetails: process.env.CIRCUIT_DETAILS !== 'false'
+              circuitDetails: process.env.CIRCUIT_DETAILS === 'true'
             });
             fs.writeFileSync('benchmark-comparison.md', result);
           "
