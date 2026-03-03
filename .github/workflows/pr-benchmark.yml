@@ -117,6 +117,21 @@ jobs:
             fs.writeFileSync('benchmark-comparison.md', result);
           "
 
+      - name: Minimize previous benchmark comments
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node_ids=$(gh api "/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            --paginate --jq '.[] | select(.body | contains("<!-- benchmark-diff -->")) | .node_id')
+          for node_id in $node_ids; do
+            gh api graphql -f query='
+              mutation($id: ID!) {
+                minimizeComment(input: {subjectId: $id, classifier: OUTDATED}) {
+                  minimizedComment { isMinimized }
+                }
+              }' -f id="$node_id"
+          done
+
       - name: Comment diff on PR
         uses: peter-evans/create-or-update-comment@v4
         with:
