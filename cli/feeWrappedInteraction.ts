@@ -60,6 +60,14 @@ export class FeeWrappedInteraction {
   }
 
   async simulate(options?: SimulateInteractionOptions) {
+    // estimateGas stripping is only needed when a paymentMethod is configured:
+    // it prevents the wallet from inflating gas limits to 2× block capacity for
+    // FPC contracts that derive on-chain values from the gas settings passed in.
+    // Without a paymentMethod this class is a pass-through and must not alter
+    // gas estimation behaviour.
+    if (!this.paymentMethod) {
+      return this.inner.simulate(options as unknown as SimulateInteractionOptions);
+    }
     const { estimateGas, ...restFee } = options?.fee ?? {};
     const adjusted = {
       ...options,
