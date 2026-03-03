@@ -118,6 +118,7 @@ jobs:
           "
 
       - name: Minimize previous benchmark comments
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
