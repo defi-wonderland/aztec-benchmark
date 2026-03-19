@@ -45,7 +45,7 @@ export interface ProfileResult {
   /** Detailed gate counts for each circuit in the function. */
   gateCounts: GateCount[];
   /** Gas usage information for the function. */
-  gas: GasLimits;
+  gas?: GasLimits;
   /** Proving time in milliseconds. */
   provingTime?: number;
 }

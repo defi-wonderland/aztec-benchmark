@@ -31,8 +31,13 @@ on:
         description: "Workflow filename that produces baselines for non-default branches"
         type: string
         default: "pr-checks.yml"
+      circuit-details:
+        description: "Include per-circuit gate breakdown in the report"
+        type: boolean
+        default: false
 
 permissions:
+  contents: read
   pull-requests: write
   issues: write
   actions: read
@@ -43,6 +48,7 @@ env:
   PR_SUFFIX: ${{ inputs.pr-suffix }}
   BASELINE_WORKFLOW: ${{ inputs.baseline-workflow }}
   PR_WORKFLOW: ${{ inputs.pr-workflow }}
+  CIRCUIT_DETAILS: ${{ inputs.circuit-details }}
 
 jobs:
   benchmark:
@@ -112,10 +118,27 @@ jobs:
               reportsDir: process.env.BENCH_DIR,
               baseSuffix: process.env.CURRENT_SUFFIX,
               prSuffix: process.env.PR_SUFFIX,
-              threshold: 2.5
+              threshold: 2.5,
+              circuitDetails: process.env.CIRCUIT_DETAILS === 'true'
             });
             fs.writeFileSync('benchmark-comparison.md', result);
           "
+
+      - name: Minimize previous benchmark comments
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node_ids=$(gh api "/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            --paginate --jq '.[] | select(.body | contains("<!-- benchmark-diff -->")) | .node_id')
+          for node_id in $node_ids; do
+            gh api graphql -f query='
+              mutation($id: ID!) {
+                minimizeComment(input: {subjectId: $id, classifier: OUTDATED}) {
+                  minimizedComment { isMinimized }
+                }
+              }' -f id="$node_id"
+          done
 
       - name: Comment diff on PR
         uses: peter-evans/create-or-update-comment@v4

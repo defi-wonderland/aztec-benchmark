@@ -147,13 +147,55 @@ function findBenchmarkPairs(reportsDir, baseSuffix, prSuffix) {
 }
 
 /**
+ * Generates an expandable circuit breakdown section for all functions in a contract.
+ * Uses <details>/<summary> HTML for a collapsible view placed below the summary table.
+ * @param {object} comparison - The comparison object keyed by function name.
+ * @param {string[]} sortedNames - Sorted function names.
+ * @returns {string} HTML string with the expandable circuit breakdown, or empty string if no data.
+ */
+function generateCircuitBreakdownSection(comparison, sortedNames, contractName) {
+  const hasAnyCircuitData = sortedNames.some(name => {
+    const gc = comparison[name]?.gateCounts;
+    return gc && gc.pr.length > 0;
+  });
+  if (!hasAnyCircuitData) return '';
+
+  const lines = [
+    '<details>',
+    `<summary>🔎 ${contractName} circuit details</summary>`,
+    '',
+  ];
+
+  for (const funcName of sortedNames) {
+    const gc = comparison[funcName]?.gateCounts;
+    if (!gc || gc.pr.length === 0) continue;
+
+    lines.push(
+      `#### \`${funcName}\``,
+      '',
+      '| Circuit | Gates |',
+      '|---------|---:|',
+    );
+
+    for (const entry of gc.pr) {
+      lines.push(`| \`${entry.circuitName}\` | ${entry.gateCount.toLocaleString()} |`);
+    }
+
+    lines.push('');
+  }
+
+  lines.push('</details>');
+  return lines.join('\n');
+}
+
+/**
  * Generates an HTML table comparing benchmark results for a single contract.
  * Handles new contracts where baseJsonPath may be null (no base report exists).
  * @param {object} pair - An object containing contractName, baseJsonPath (or null), and prJsonPath.
  * @param {number} threshold - The percentage threshold for highlighting regressions.
  * @returns {string} An HTML string representing the comparison table, or an error message.
  */
-function generateContractComparisonTable(pair, threshold) {
+function generateContractComparisonTable(pair, threshold, { circuitDetails = false } = {}) {
   const { contractName, baseJsonPath, prJsonPath } = pair;
   const isNewContract = baseJsonPath === null;
   
@@ -209,6 +251,7 @@ function generateContractComparisonTable(pair, threshold) {
       daGas: { main: getDaGas(mainResult), pr: getDaGas(prResult) },
       l2Gas: { main: getL2Gas(mainResult), pr: getL2Gas(prResult) },
       provingTime: { main: getProvingTime(mainResult), pr: getProvingTime(prResult) },
+      gateCounts: { main: mainResult?.gateCounts ?? [], pr: prResult?.gateCounts ?? [] },
     };
   }
 
@@ -216,28 +259,28 @@ function generateContractComparisonTable(pair, threshold) {
     '<table>',
     '<thead>',
     '<tr>',
-    '  <th></th>',
-    '  <th>Function</th>',
-    '  <th colspan="3">Gates</th>',
-    '  <th colspan="3">DA Gas</th>',
-    '  <th colspan="3">L2 Gas</th>',
-    '  <th colspan="3">Proving Time (ms)</th>',
+      '<th>🚦</th>',
+      '<th>Function</th>',
+      '<th colspan="3">Gates</th>',
+      '<th colspan="3">DA Gas</th>',
+      '<th colspan="3">L2 Gas</th>',
+      '<th colspan="3">Proving Time (ms)</th>',
     '</tr>',
     '<tr>',
-    '  <th>Status</th>',
-    '  <th></th>',
-    '  <th>Base</th>',
-    '  <th>PR</th>',
-    '  <th>Diff</th>',
-    '  <th>Base</th>',
-    '  <th>PR</th>',
-    '  <th>Diff</th>',
-    '  <th>Base</th>',
-    '  <th>PR</th>',
-    '  <th>Diff</th>',
-    '  <th>Base</th>',
-    '  <th>PR</th>',
-    '  <th>Diff</th>',
+      '<th></th>',
+      '<th></th>',
+      '<th>Base</th>',
+      '<th>PR</th>',
+      '<th>Diff</th>',
+      '<th>Base</th>',
+      '<th>PR</th>',
+      '<th>Diff</th>',
+      '<th>Base</th>',
+      '<th>PR</th>',
+      '<th>Diff</th>',
+      '<th>Base</th>',
+      '<th>PR</th>',
+      '<th>Diff</th>',
     '</tr>',
     '</thead>',
     '<tbody>',
@@ -254,31 +297,44 @@ function generateContractComparisonTable(pair, threshold) {
     if (!metrics) continue;
 
     const statusEmoji = getStatusEmoji(metrics, threshold);
+    const ptMain = metrics.provingTime.main > 0 ? Math.round(metrics.provingTime.main).toLocaleString() : 'N/A';
+    const ptPr = metrics.provingTime.pr > 0 ? Math.round(metrics.provingTime.pr).toLocaleString() : 'N/A';
+    const ptDiff = formatDiff(Math.round(metrics.provingTime.main), Math.round(metrics.provingTime.pr));
     output.push(
       '<tr>',
-      `  <td align="center">${statusEmoji}</td>`,
-      `  <td><code>${funcName}</code></td>`,
+        `<td align="center">${statusEmoji}</td>`,
+        `<td><code>${funcName}</code></td>`,
       // Gates
-      `  <td align="right">${metrics.gates.main.toLocaleString()}</td>`,
-      `  <td align="right">${metrics.gates.pr.toLocaleString()}</td>`,
-      `  <td align="right">${formatDiff(metrics.gates.main, metrics.gates.pr)}</td>`,
+        `<td align="right">${metrics.gates.main.toLocaleString()}</td>`,
+        `<td align="right">${metrics.gates.pr.toLocaleString()}</td>`,
+        `<td align="right">${formatDiff(metrics.gates.main, metrics.gates.pr)}</td>`,
       // DA Gas
-      `  <td align="right">${metrics.daGas.main.toLocaleString()}</td>`,
-      `  <td align="right">${metrics.daGas.pr.toLocaleString()}</td>`,
-      `  <td align="right">${formatDiff(metrics.daGas.main, metrics.daGas.pr)}</td>`,
+        `<td align="right">${metrics.daGas.main.toLocaleString()}</td>`,
+        `<td align="right">${metrics.daGas.pr.toLocaleString()}</td>`,
+        `<td align="right">${formatDiff(metrics.daGas.main, metrics.daGas.pr)}</td>`,
       // L2 Gas
-      `  <td align="right">${metrics.l2Gas.main.toLocaleString()}</td>`,
-      `  <td align="right">${metrics.l2Gas.pr.toLocaleString()}</td>`,
-      `  <td align="right">${formatDiff(metrics.l2Gas.main, metrics.l2Gas.pr)}</td>`,
+        `<td align="right">${metrics.l2Gas.main.toLocaleString()}</td>`,
+        `<td align="right">${metrics.l2Gas.pr.toLocaleString()}</td>`,
+        `<td align="right">${formatDiff(metrics.l2Gas.main, metrics.l2Gas.pr)}</td>`,
       // Proving Time
-      `  <td align="right">${metrics.provingTime.main > 0 ? Math.round(metrics.provingTime.main).toLocaleString() : 'N/A'}</td>`,
-      `  <td align="right">${metrics.provingTime.pr > 0 ? Math.round(metrics.provingTime.pr).toLocaleString() : 'N/A'}</td>`,
-      `  <td align="right">${formatDiff(Math.round(metrics.provingTime.main), Math.round(metrics.provingTime.pr))}</td>`,
+        `<td align="right">${ptMain}</td>`,
+        `<td align="right">${ptPr}</td>`,
+        `<td align="right">${ptDiff}</td>`,
       '</tr>',
     );
+
   }
 
   output.push('</tbody>', '</table>');
+
+  // Add expandable circuit breakdown section below the summary table
+  if (circuitDetails) {
+    const circuitSection = generateCircuitBreakdownSection(comparison, sortedNames, contractName);
+    if (circuitSection) {
+      output.push('', circuitSection);
+    }
+  }
+
   return output.join('\n');
 };
 
@@ -293,7 +349,7 @@ function generateContractComparisonTable(pair, threshold) {
  * @returns {string} A markdown string containing the full comparison report.
  */
 function runComparison(inputs) {
-  const { reportsDir, baseSuffix, prSuffix, threshold } = inputs;
+  const { reportsDir, baseSuffix, prSuffix, threshold, circuitDetails = false } = inputs;
   console.log("Comparison script starting...");
   console.log(` Reports Dir: ${reportsDir} (expected ./benchmarks)`);
   console.log(` Base Suffix: '${baseSuffix}' (expected _base)`);
@@ -329,7 +385,7 @@ function runComparison(inputs) {
 
   for (const pair of benchmarkPairs) {
     console.log(`\nProcessing contract: ${pair.contractName}...`);
-    const tableMarkdown = generateContractComparisonTable(pair, threshold);
+    const tableMarkdown = generateContractComparisonTable(pair, threshold, { circuitDetails });
     markdownOutput.push(`## Contract: ${pair.contractName}\n`);
     markdownOutput.push(tableMarkdown);
     markdownOutput.push('\n');

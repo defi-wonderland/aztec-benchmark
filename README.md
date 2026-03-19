@@ -232,7 +232,7 @@ This repository ships two **reusable GitHub workflows** (`workflow_call`) that h
 
 ### PR Benchmark (`pr-benchmark.yml`)
 
-Runs benchmarks on the PR head, downloads the baseline from the base branch, generates a comparison report, comments it on the PR, and uploads the new results as a baseline artifact for the PR branch.
+Runs benchmarks on the PR head, downloads the baseline from the base branch, generates a comparison report, comments it on the PR (hiding any previous benchmark comments as outdated), and uploads the new results as a baseline artifact for the PR branch.
 
 **Usage:**
 
@@ -313,7 +313,8 @@ The workflows use GitHub Actions artifacts to store and retrieve baseline benchm
 
 1. **`update-baseline.yml`** runs benchmarks with the `_latest` suffix and uploads the results as `benchmark-baseline-<branch>`.
 2. **`pr-benchmark.yml`** runs benchmarks with the `_new` suffix on the PR head, then downloads the `benchmark-baseline-<base-branch>` artifact to get the `_latest` files. It compares `_latest` (baseline) vs `_new` (PR) and comments a Markdown diff table on the PR.
-3. After comparison, the PR workflow renames `_new` files to `_latest` and uploads them as `benchmark-baseline-<head-branch>`, so stacked PRs can also compare against each other.
+3. Before posting the new comment, the workflow finds all previous benchmark comments on the PR (identified by a unique marker in the comment body) and hides them as **Outdated** via the GitHub GraphQL API, so the PR timeline stays clean.
+4. After comparison, the PR workflow renames `_new` files to `_latest` and uploads them as `benchmark-baseline-<head-branch>`, so stacked PRs can also compare against each other.
 
 Artifacts are retained for **90 days** by default.
 

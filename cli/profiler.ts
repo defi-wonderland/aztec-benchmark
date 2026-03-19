@@ -177,7 +177,8 @@ export class Profiler {
         : undefined;
 
       // Gas simulated is 10% higher by default, we set the padding to 0 to get a better estimate.
-      const gas: GasLimits = (await f.action.simulate({ from: origin, includeMetadata: true, fee: { estimateGas: true, estimatedGasPadding: 0, ...feeOpts } })).estimatedGas;
+      const simResult = await f.action.simulate({ from: origin, includeMetadata: true, fee: { estimateGas: true, estimatedGasPadding: 0, ...feeOpts } });
+      const gas: GasLimits | undefined = simResult.estimatedGas;
       // Profile the tx to get gate counts and optionally proving time.
       const profileResults = await f.action.profile({
         profileMode: 'full',
