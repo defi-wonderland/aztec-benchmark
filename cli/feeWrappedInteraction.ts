@@ -65,7 +65,7 @@ export class FeeWrappedInteraction {
     // FPC contracts that derive on-chain values from the gas settings passed in.
     // Without a paymentMethod this class is a pass-through and must not alter
     // gas estimation behaviour.
-    if (!this.paymentMethod) {
+    if (!this.paymentMethod && !options?.fee?.paymentMethod) {
       return this.inner.simulate(options as unknown as SimulateInteractionOptions);
     }
     const { estimateGas, ...restFee } = options?.fee ?? {};
