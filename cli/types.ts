@@ -1,3 +1,4 @@
+import type { AztecAddress } from '@aztec/aztec.js/addresses';
 import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
 import type { FeePaymentMethod } from '@aztec/aztec.js/fee';
 import { EmbeddedWallet } from '@aztec/wallets/embedded';
@@ -56,6 +57,10 @@ export interface NamedBenchmarkedInteraction {
   interaction: ContractFunctionInteractionCallIntent;
   /** The custom name to be used for this benchmark in reports. */
   name: string;
+  /** Extra addresses whose private notes the PXE should be able to access
+   *  during simulation, profiling, and sending. Forwarded as
+   *  `additionalScopes` to the Aztec.js interaction methods. */
+  additionalScopes?: AztecAddress[];
 }
 
 /** Structure of the output JSON report */
