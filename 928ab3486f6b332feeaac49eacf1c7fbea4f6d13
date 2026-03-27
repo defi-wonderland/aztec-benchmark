@@ -1,0 +1,25 @@
+cli/profiler.ts
+  0669c80cd90a5452 1,64,142,181,187,197
+cli/types.ts
+  0669c80cd90a5452 1,60-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "928ab3486f6b332feeaac49eacf1c7fbea4f6d13",
+  "prompts": {
+    "0669c80cd90a5452": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8fd87eea-c748-490f-95d3-daa32f8beea0",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "xorsal <zorzal@wonderland.xyz>",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 4,
+      "accepted_lines": 9,
+      "overriden_lines": 0
+    }
+  }
+}
