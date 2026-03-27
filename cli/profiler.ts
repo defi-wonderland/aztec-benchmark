@@ -1,3 +1,4 @@
+import type { AztecAddress } from '@aztec/aztec.js/addresses';
 import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
 import type { FeePaymentMethod } from '@aztec/aztec.js/fee';
 import { EmbeddedWallet } from '@aztec/wallets/embedded';
@@ -60,7 +61,7 @@ export class Profiler {
     for (const item of fsToProfile) {
       if ('interaction' in item && 'name' in item) {
         // This is a NamedBenchmarkedInteraction object
-        results.push(await this.#profileOne(item.interaction, item.name));
+        results.push(await this.#profileOne(item.interaction, item.name, item.additionalScopes));
       } else {
         // This is a plain ContractFunctionInteractionCallIntent
         results.push(await this.#profileOne(item as ContractFunctionInteractionCallIntent)); // Pass undefined for customName
@@ -138,7 +139,7 @@ export class Profiler {
    *          Returns a result with FAILED in the name and zero counts/gas if profiling errors.
    * @private
    */
-  async #profileOne(f: ContractFunctionInteractionCallIntent, customName?: string): Promise<ProfileResult> {
+  async #profileOne(f: ContractFunctionInteractionCallIntent, customName?: string, additionalScopes?: AztecAddress[]): Promise<ProfileResult> {
     let name: string;
     if (customName) {
       name = customName;
@@ -177,12 +178,13 @@ export class Profiler {
         : undefined;
 
       // Gas simulated is 10% higher by default, we set the padding to 0 to get a better estimate.
-      const simResult = await f.action.simulate({ from: origin, includeMetadata: true, fee: { estimateGas: true, estimatedGasPadding: 0, ...feeOpts } });
+      const simResult = await f.action.simulate({ from: origin, additionalScopes, includeMetadata: true, fee: { estimateGas: true, estimatedGasPadding: 0, ...feeOpts } });
       const gas: GasLimits | undefined = simResult.estimatedGas;
       // Profile the tx to get gate counts and optionally proving time.
       const profileResults = await f.action.profile({
         profileMode: 'full',
         from: origin,
+        additionalScopes,
         skipProofGeneration: this.#skipProving,
         fee: feeOpts,
       });
@@ -192,7 +194,7 @@ export class Profiler {
         : undefined;
 
       // Send the tx (this proves again internally).
-      await f.action.send({ from: origin, fee: feeOpts });
+      await f.action.send({ from: origin, additionalScopes, fee: feeOpts });
 
       const result: ProfileResult = {
         name,
