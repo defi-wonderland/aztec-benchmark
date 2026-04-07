@@ -129,7 +129,11 @@ program
           process.exit(1);
         }
 
-        const profiler = new Profiler(runContext.wallet, { skipProving: options.skipProving, feePaymentMethod: runContext.feePaymentMethod });
+        const regions = typeof benchmarkInstance.getRegions === 'function'
+          ? benchmarkInstance.getRegions()
+          : undefined;
+
+        const profiler = new Profiler(runContext.wallet, { skipProving: options.skipProving, feePaymentMethod: runContext.feePaymentMethod, regions });
 
         console.log(`Getting methods to benchmark for ${contractName}...`);
         const interactionsToBenchmark: Array<ContractFunctionInteractionCallIntent | NamedBenchmarkedInteraction> = benchmarkInstance.getMethods(runContext);
