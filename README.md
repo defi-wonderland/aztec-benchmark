@@ -13,6 +13,8 @@ Use the CLI to execute benchmark files written in TypeScript. For CI integration
   - [Options](#options)
   - [Examples](#examples)
 - [Writing Benchmarks](#writing-benchmarks)
+  - [Trace Regions](#trace-regions)
+  - [Raw Transaction Support](#raw-transaction-support)
 - [Benchmark Output](#benchmark-output)
 - [Reusable Workflows](#reusable-workflows)
   - [PR Benchmark (`pr-benchmark.yml`)](#pr-benchmark-pr-benchmarkyml)
@@ -213,6 +215,85 @@ If you provide a `NamedBenchmarkedInteraction` object, its `name` field will be 
 If you provide a plain `ContractFunctionInteractionCallIntent`, the tool will attempt to derive a name from the interaction (e.g., the method name).
 If you return a `feePaymentMethod` in the `BenchmarkContext`, it is automatically passed to every transaction the profiler sends — no changes to `getMethods` are needed.
 
+### Trace Regions
+
+By default, benchmarks report gate counts for the entire transaction trace, including kernel circuit overhead. For contracts like FPCs where you want to isolate specific portions of the trace, implement the optional `getRegions()` method:
+
+```ts
+import { Benchmark } from '@defi-wonderland/aztec-benchmark';
+
+export default class FPCBenchmark extends Benchmark {
+  getRegions() {
+    return [
+      {
+        name: 'fpc-only',
+        startMatch: ['FPC:', 'FPCMultiAsset:'],  // start at first FPC step
+        endMatch: 'Noop:',                        // stop before the Noop delimiter
+      },
+    ];
+  }
+
+  // ... setup(), getMethods(), teardown()
+}
+```
+
+**Region options:**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `name` | `string` | Display name for this region in reports |
+| `startMatch` | `string \| string[]` | Contract name prefix(es) marking the first step |
+| `endMatch` | `string \| string[]` | Contract name prefix(es) marking the end boundary (exclusive). Omit to include until end of trace |
+| `excludeKernels` | `boolean` | If `true`, filter out `private_kernel_*` and `hiding_kernel` circuits from the region |
+
+The profiler also ships a **built-in kernel isolation preset** that auto-splits the trace into "app" (non-kernel) and "kernel" (overhead) regions:
+
+```ts
+import { Benchmark, kernelIsolation } from '@defi-wonderland/aztec-benchmark';
+
+export default class MyBenchmark extends Benchmark {
+  getRegions() {
+    return kernelIsolation();
+  }
+  // ...
+}
+```
+
+When regions are configured, the JSON report includes:
+- `regions` on each `ProfileResult` — per-region gate count breakdowns
+- `regionSummaries` on the report — region name -> function name -> total gates
+- PR comparison comments show a collapsible **region breakdown** section
+
+### Raw Transaction Support
+
+Some contracts (e.g., cold-start FPCs) must be the transaction root (`msg_sender = None`), bypassing the account entrypoint. For these, return a `RawBenchmarkedInteraction` from `getMethods()`:
+
+```ts
+import { Benchmark, type RawBenchmarkedInteraction } from '@defi-wonderland/aztec-benchmark';
+
+export default class ColdStartBenchmark extends Benchmark {
+  async setup() {
+    // ... build TxExecutionRequest, set up PXE, etc.
+    return { wallet, _coldStartAction: myAction };
+  }
+
+  getMethods(context) {
+    return [{
+      action: context._coldStartAction,  // implements simulate(), profile(), send()
+      caller: context.userAddress,
+      name: 'cold_start_entrypoint',
+    }];
+  }
+}
+```
+
+Your action object must implement:
+- `simulate(opts?)` — should return `{ estimatedGas: { gasLimits, teardownGasLimits } }`
+- `profile(opts?)` — should return a `TxProfileResult`-compatible object with `executionSteps` and `stats`
+- `send(opts?)` — submit the transaction on-chain
+
+The profiler calls these directly **without injecting fee options or origin** — your action manages all transaction construction internally.
+
 ### Wonderland's Usage Example
 
 You can find how we use this tool for benchmarking our Aztec contracts in [`aztec-standards`](https://github.com/defi-wonderland/aztec-standards/tree/dev/benchmarks).
@@ -221,8 +302,36 @@ You can find how we use this tool for benchmarking our Aztec contracts in [`azte
 
 ## Benchmark Output
 
-Your `BenchmarkBase` implementation is responsible for measuring and outputting performance data (e.g., as JSON). The comparison action uses this output.
-Each entry in the output will be identified by the custom `name` you provided (if any) or the auto-derived name.
+The profiler generates a JSON report for each benchmarked contract. Each entry includes:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `totalGateCount` | `number` | Total gates across all circuits |
+| `gateCounts[]` | `GateCount[]` | Per-circuit breakdown with `circuitName`, `gateCount`, and `witgenMs` (witness generation time) |
+| `gas` | `GasLimits` | DA and L2 gas estimates |
+| `provingTime` | `number` | Proving time in ms (hardware-dependent) |
+| `regions` | `Record<string, RegionResult>` | Per-region gate counts (if `getRegions()` is defined) |
+
+**Metric stability:** Gate counts and gas are **deterministic** — identical across runs on any hardware. Witness generation time (`witgenMs`) and proving time are **hardware-dependent** and should not be used for tight regression thresholds in CI. Reports include a `metricStability` field annotating each metric.
+
+### Programmatic Comparison
+
+You can compare two reports programmatically without the CLI:
+
+```ts
+import { compareReports } from '@defi-wonderland/aztec-benchmark';
+
+const result = compareReports(baseReport, prReport, {
+  gates: 1.0,        // 1% threshold for gate counts
+  daGas: 2.5,        // 2.5% for DA gas
+  l2Gas: 2.5,        // 2.5% for L2 gas
+  provingTime: null,  // info-only (never triggers regression)
+});
+
+if (result.hasRegression) {
+  console.log('Regressions detected:', result.entries.filter(e => e.status === 'regression'));
+}
+```
 
 ---
 
@@ -328,7 +437,8 @@ This repository also includes a GitHub Action (defined in `action/action.yml`) t
 
 ### Inputs
 
-- `threshold`: Regression threshold percentage (default: `2.5`).
+- `threshold`: Scalar regression threshold percentage applied to gates, DA gas, and L2 gas (default: `2.5`).
+- `thresholds`: Per-metric thresholds as JSON string. Overrides `threshold` when set. Example: `'{"gates": 1.0, "daGas": 2.5, "l2Gas": 2.5, "provingTime": null}'`. Use `null` for info-only metrics (shown but never trigger regression).
 - `output_markdown_path`: Path to save the generated Markdown comparison report (default: `benchmark-comparison.md`).
 
 ### Outputs

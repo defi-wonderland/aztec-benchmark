@@ -4,8 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import toml from '@iarna/toml';
 import { Profiler } from './profiler.js';
-import { BenchmarkBase, BenchmarkContext, type ProfileResult, type NamedBenchmarkedInteraction } from './types.js';
-import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
+import { BenchmarkBase, BenchmarkContext, type BenchmarkableItem } from './types.js';
 
 /**
  * Represents the structure of the [benchmark] section in Nargo.toml.
@@ -129,10 +128,14 @@ program
           process.exit(1);
         }
 
-        const profiler = new Profiler(runContext.wallet, { skipProving: options.skipProving, feePaymentMethod: runContext.feePaymentMethod });
+        const regions = typeof benchmarkInstance.getRegions === 'function'
+          ? benchmarkInstance.getRegions()
+          : undefined;
+
+        const profiler = new Profiler(runContext.wallet, { skipProving: options.skipProving, feePaymentMethod: runContext.feePaymentMethod, regions });
 
         console.log(`Getting methods to benchmark for ${contractName}...`);
-        const interactionsToBenchmark: Array<ContractFunctionInteractionCallIntent | NamedBenchmarkedInteraction> = benchmarkInstance.getMethods(runContext);
+        const interactionsToBenchmark: BenchmarkableItem[] = benchmarkInstance.getMethods(runContext);
 
         if (!Array.isArray(interactionsToBenchmark) || interactionsToBenchmark.length === 0) {
           console.warn(`No benchmark methods returned by getMethods for ${contractName}. Saving empty report.`);

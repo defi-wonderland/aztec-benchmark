@@ -34,6 +34,10 @@ inputs:
     description: 'If true, includes per-circuit gate count breakdown in an expandable section below each contract table.'
     required: false
     default: 'false'
+  thresholds:
+    description: 'Per-metric regression thresholds as JSON (e.g., {"gates": 1.0, "daGas": 2.5, "l2Gas": 2.5, "provingTime": null}). Overrides scalar threshold when set. null = info-only.'
+    required: false
+    default: ''
 outputs:
   comparison_markdown:
     description: "The generated comparison report in Markdown format."

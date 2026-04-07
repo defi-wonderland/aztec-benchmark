@@ -17,7 +17,10 @@ const { runComparison } = require('./comparison.cjs');
  */
 async function run() {
   try {
-    const threshold = parseFloat(core.getInput('threshold'));
+    const thresholdsInput = core.getInput('thresholds');
+    const threshold = thresholdsInput
+      ? JSON.parse(thresholdsInput)
+      : parseFloat(core.getInput('threshold'));
     const outputMarkdownPath = core.getInput('output_markdown_path');
     const baseSuffix = core.getInput('base_suffix');
     const currentSuffix = core.getInput('current_suffix');

@@ -10,8 +10,11 @@ import {
   type Gas,
   type GasLimits,
   type NamedBenchmarkedInteraction,
+  type BenchmarkableItem,
 } from './types.js';
 import { getSystemInfo } from './systemInfo.js';
+import { applyRegions, type TraceRegion } from './traceRegions.js';
+import { isRawInteraction, type RawBenchmarkedInteraction } from './rawInteraction.js';
 
 /**
  * Sums all numbers in an array.
@@ -35,6 +38,8 @@ interface ProfilerOptions {
   skipProving?: boolean;
   /** Fee payment method to use when sending transactions. */
   feePaymentMethod?: FeePaymentMethod;
+  /** Trace regions to extract per-region gate count breakdowns. */
+  regions?: TraceRegion[];
 }
 
 /**
@@ -43,11 +48,13 @@ interface ProfilerOptions {
 export class Profiler {
   #skipProving: boolean;
   #feePaymentMethod?: FeePaymentMethod;
+  #regions?: TraceRegion[];
 
   /** @param _wallet - Unused, kept for backward compatibility with existing callers. */
   constructor(_wallet?: EmbeddedWallet, options?: ProfilerOptions) {
     this.#skipProving = options?.skipProving ?? false;
     this.#feePaymentMethod = options?.feePaymentMethod;
+    this.#regions = options?.regions;
   }
 
   /**
@@ -56,10 +63,13 @@ export class Profiler {
    * @param fsToProfile - An array of items to profile.
    * @returns A promise that resolves to an array of profile results.
    */
-  async profile(fsToProfile: Array<ContractFunctionInteractionCallIntent | NamedBenchmarkedInteraction>): Promise<ProfileResult[]> {
+  async profile(fsToProfile: BenchmarkableItem[]): Promise<ProfileResult[]> {
     const results: ProfileResult[] = [];
     for (const item of fsToProfile) {
-      if ('interaction' in item && 'name' in item) {
+      if (isRawInteraction(item)) {
+        // Raw interaction — action handles its own simulate/profile/send
+        results.push(await this.#profileOneRaw(item));
+      } else if ('interaction' in item && 'name' in item) {
         // This is a NamedBenchmarkedInteraction object
         results.push(await this.#profileOne(item.interaction, item.name, item.additionalScopes));
       } else {
@@ -114,11 +124,33 @@ export class Profiler {
       {} as Record<string, number>,
     );
 
+    // Apply trace region extraction if regions are configured
+    if (this.#regions?.length) {
+      for (const result of results) {
+        if (result.gateCounts.length) {
+          result.regions = applyRegions(result.gateCounts, this.#regions);
+        }
+      }
+    }
+
+    // Build per-region summaries: region name → function name → total gates
+    const regionSummaries = this.#regions?.length
+      ? this.#buildRegionSummaries(results)
+      : undefined;
+
     const report: ProfileReport = {
       summary,
       results: results,
       gasSummary,
       provingTimeSummary,
+      regionSummaries,
+      metricStability: {
+        totalGateCount: 'deterministic',
+        gateCounts: 'deterministic',
+        gas: 'deterministic',
+        witgenMs: 'hardware-dependent',
+        provingTime: 'hardware-dependent',
+      },
       systemInfo,
     };
 
@@ -129,6 +161,21 @@ export class Profiler {
       console.error(`Error writing results to ${filename}:`, error.message);
       throw error;
     }
+  }
+
+  /**
+   * Builds region summaries: for each region, a map of function name → total gate count in that region.
+   */
+  #buildRegionSummaries(results: ProfileResult[]): Record<string, Record<string, number>> {
+    const summaries: Record<string, Record<string, number>> = {};
+    for (const result of results) {
+      if (!result.regions) continue;
+      for (const [regionName, regionResult] of Object.entries(result.regions)) {
+        if (!summaries[regionName]) summaries[regionName] = {};
+        summaries[regionName][result.name] = regionResult.totalGateCount;
+      }
+    }
+    return summaries;
   }
 
   /**
@@ -206,6 +253,7 @@ export class Profiler {
         gateCounts: profileResults.executionSteps.map(step => ({
           circuitName: step.functionName,
           gateCount: step.gateCount || 0,
+          witgenMs: step.timings?.witgen,
         })),
         gas,
         provingTime,
@@ -221,4 +269,60 @@ export class Profiler {
       throw error;
     }
   }
-} 
+
+  /**
+   * Profiles a raw interaction that manages its own simulate/profile/send lifecycle.
+   * Does NOT inject fee options, origin, or additional scopes — the action handles everything.
+   * @param item - The raw benchmarked interaction.
+   * @returns A promise that resolves to a profile result.
+   * @private
+   */
+  async #profileOneRaw(item: RawBenchmarkedInteraction): Promise<ProfileResult> {
+    const name = item.name;
+    console.log(`Profiling ${name} (raw interaction)...`);
+
+    try {
+      // 1. Simulate — action manages its own options
+      const simResult = await item.action.simulate();
+      const gas: GasLimits | undefined = simResult?.estimatedGas;
+
+      // 2. Profile — action manages its own options
+      const profileResults = await item.action.profile({
+        profileMode: 'full',
+        skipProofGeneration: this.#skipProving,
+      });
+
+      const provingTime = !this.#skipProving
+        ? profileResults.stats?.timings?.proving
+        : undefined;
+
+      // 3. Send — action manages its own options
+      await item.action.send();
+
+      const result: ProfileResult = {
+        name,
+        totalGateCount: sumArray(
+          profileResults.executionSteps
+            .map((step: any) => step.gateCount)
+            .filter((count: any): count is number => count !== undefined),
+        ),
+        gateCounts: profileResults.executionSteps.map((step: any) => ({
+          circuitName: step.functionName,
+          gateCount: step.gateCount || 0,
+          witgenMs: step.timings?.witgen,
+        })),
+        gas,
+        provingTime,
+      };
+
+      const daGas = gas?.gasLimits?.daGas ?? 'N/A';
+      const l2Gas = gas?.gasLimits?.l2Gas ?? 'N/A';
+      const provingDisplay = provingTime !== undefined ? `${provingTime}ms` : 'skipped';
+      console.log(` -> ${name}: ${result.totalGateCount} gates, Gas (DA: ${daGas}, L2: ${l2Gas}), Proving: ${provingDisplay}`);
+      return result;
+    } catch (error: any) {
+      console.error(`Error profiling ${name}:`, error.message);
+      throw error;
+    }
+  }
+}

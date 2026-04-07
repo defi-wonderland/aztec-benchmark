@@ -1,0 +1,2 @@
+[benchmark]
+mock = "mock.benchmark.ts"

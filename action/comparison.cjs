@@ -67,9 +67,28 @@ const formatDiff = (main, pr) => {
 };
 
 /**
- * Determines an emoji status based on benchmark metric changes and a threshold.
+ * Normalizes a threshold input into a per-metric thresholds object.
+ * Accepts either a single number (applied to gates/daGas/l2Gas, provingTime info-only)
+ * or an object with per-metric thresholds. null means info-only (never triggers regression).
+ * @param {number|object} threshold - Scalar percentage or per-metric thresholds object.
+ * @returns {object} Normalized thresholds: { gates, daGas, l2Gas, provingTime }.
+ */
+function normalizeThresholds(threshold) {
+  if (typeof threshold === 'number') {
+    return { gates: threshold, daGas: threshold, l2Gas: threshold, provingTime: null };
+  }
+  return {
+    gates: threshold.gates ?? 2.5,
+    daGas: threshold.daGas ?? 2.5,
+    l2Gas: threshold.l2Gas ?? 2.5,
+    provingTime: threshold.provingTime ?? null,
+  };
+}
+
+/**
+ * Determines an emoji status based on benchmark metric changes and per-metric thresholds.
  * @param {object} metrics - An object containing main and pr values for gates, daGas, and l2Gas.
- * @param {number} threshold - The percentage threshold for significant change.
+ * @param {number|object} threshold - Scalar percentage or per-metric thresholds object.
  * @returns {string} An emoji: '🚮' for removed, '🆕' for new, '🔴' for regression, '🟢' for improvement, '⚪' for no significant change.
  */
 const getStatusEmoji = (metrics, threshold) => {
@@ -81,6 +100,8 @@ const getStatusEmoji = (metrics, threshold) => {
   if (isRemoved) return '🚮';
   if (isNew) return '🆕';
 
+  const t = normalizeThresholds(threshold);
+
   // Avoid division by zero, handle infinite increases
   const gateDiffPct = metrics.gates.main === 0 ? (metrics.gates.pr > 0 ? Infinity : 0) :
                     (metrics.gates.pr - metrics.gates.main) / metrics.gates.main;
@@ -89,14 +110,17 @@ const getStatusEmoji = (metrics, threshold) => {
   const l2GasDiffPct = metrics.l2Gas.main === 0 ? (metrics.l2Gas.pr > 0 ? Infinity : 0) :
                     (metrics.l2Gas.pr - metrics.l2Gas.main) / metrics.l2Gas.main;
 
-  const metricsDiffs = [gateDiffPct, daGasDiffPct, l2GasDiffPct].filter(m => isFinite(m));
-  const hasInfiniteIncrease = [gateDiffPct, daGasDiffPct, l2GasDiffPct].some(m => m === Infinity);
+  // Build checks only for metrics that have a non-null threshold
+  const checks = [];
+  if (t.gates != null) checks.push({ diff: gateDiffPct, threshold: t.gates / 100.0 });
+  if (t.daGas != null) checks.push({ diff: daGasDiffPct, threshold: t.daGas / 100.0 });
+  if (t.l2Gas != null) checks.push({ diff: l2GasDiffPct, threshold: t.l2Gas / 100.0 });
 
-  // Use threshold percentage directly
-  const thresholdDecimal = threshold / 100.0;
+  const finiteChecks = checks.filter(c => isFinite(c.diff));
+  const hasInfiniteIncrease = checks.some(c => c.diff === Infinity);
 
-  const hasRegression = hasInfiniteIncrease || metricsDiffs.some(m => m > thresholdDecimal);
-  const hasImprovement = metricsDiffs.some(m => m < -thresholdDecimal);
+  const hasRegression = hasInfiniteIncrease || finiteChecks.some(c => c.diff > c.threshold);
+  const hasImprovement = finiteChecks.some(c => c.diff < -c.threshold);
 
   if (hasRegression) return '🔴'; // Regression
   if (hasImprovement) return '🟢'; // Improvement
@@ -189,6 +213,78 @@ function generateCircuitBreakdownSection(comparison, sortedNames, contractName) 
 }
 
 /**
+ * Generates a collapsible section showing per-region gate count comparisons.
+ * Each region gets its own table showing Base vs PR vs Diff for total gates.
+ * @param {object} comparison - The comparison object keyed by function name.
+ * @param {string[]} sortedNames - Sorted function names.
+ * @param {number} threshold - Regression threshold percentage.
+ * @param {string} contractName - The contract name for the section header.
+ * @returns {string} HTML string with collapsible region comparisons, or empty string if no region data.
+ */
+function generateRegionComparisonSection(comparison, sortedNames, threshold, contractName) {
+  // Check if any function has region data
+  const hasRegionData = sortedNames.some(name => {
+    const regions = comparison[name]?.regions;
+    return regions && (Object.keys(regions.pr).length > 0 || Object.keys(regions.main).length > 0);
+  });
+  if (!hasRegionData) return '';
+
+  // Collect all region names across all functions
+  const allRegionNames = new Set();
+  for (const funcName of sortedNames) {
+    const regions = comparison[funcName]?.regions;
+    if (regions) {
+      for (const name of Object.keys(regions.main)) allRegionNames.add(name);
+      for (const name of Object.keys(regions.pr)) allRegionNames.add(name);
+    }
+  }
+
+  if (allRegionNames.size === 0) return '';
+
+  const lines = [
+    '<details>',
+    `<summary>📊 ${contractName} region breakdown</summary>`,
+    '',
+  ];
+
+  for (const regionName of [...allRegionNames].sort()) {
+    lines.push(
+      `#### Region: \`${regionName}\``,
+      '',
+      '| 🚦 | Function | Base Gates | PR Gates | Diff |',
+      '|:---:|----------|----------:|--------:|------|',
+    );
+
+    for (const funcName of sortedNames) {
+      const regions = comparison[funcName]?.regions;
+      const mainRegion = regions?.main?.[regionName];
+      const prRegion = regions?.pr?.[regionName];
+
+      const mainGates = mainRegion?.totalGateCount ?? 0;
+      const prGates = prRegion?.totalGateCount ?? 0;
+
+      // Determine status for this region
+      const regionMetrics = {
+        gates: { main: mainGates, pr: prGates },
+        daGas: { main: 0, pr: 0 },
+        l2Gas: { main: 0, pr: 0 },
+      };
+      const emoji = getStatusEmoji(regionMetrics, threshold);
+      const diff = formatDiff(mainGates, prGates);
+
+      lines.push(
+        `| ${emoji} | \`${funcName}\` | ${mainGates.toLocaleString()} | ${prGates.toLocaleString()} | ${diff} |`,
+      );
+    }
+
+    lines.push('');
+  }
+
+  lines.push('</details>');
+  return lines.join('\n');
+}
+
+/**
  * Generates an HTML table comparing benchmark results for a single contract.
  * Handles new contracts where baseJsonPath may be null (no base report exists).
  * @param {object} pair - An object containing contractName, baseJsonPath (or null), and prJsonPath.
@@ -252,6 +348,7 @@ function generateContractComparisonTable(pair, threshold, { circuitDetails = fal
       l2Gas: { main: getL2Gas(mainResult), pr: getL2Gas(prResult) },
       provingTime: { main: getProvingTime(mainResult), pr: getProvingTime(prResult) },
       gateCounts: { main: mainResult?.gateCounts ?? [], pr: prResult?.gateCounts ?? [] },
+      regions: { main: mainResult?.regions ?? {}, pr: prResult?.regions ?? {} },
     };
   }
 
@@ -333,6 +430,12 @@ function generateContractComparisonTable(pair, threshold, { circuitDetails = fal
     if (circuitSection) {
       output.push('', circuitSection);
     }
+  }
+
+  // Add per-region comparison sections if any results have region data
+  const regionSection = generateRegionComparisonSection(comparison, sortedNames, threshold, contractName);
+  if (regionSection) {
+    output.push('', regionSection);
   }
 
   return output.join('\n');
