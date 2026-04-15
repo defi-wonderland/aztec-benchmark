@@ -9,8 +9,13 @@
     "aztec-benchmark": "bin/aztec-benchmark"
   },
   "scripts": {
+    "postinstall": "husky",
     "build": "tsc && ncc build action/index.cjs -o action/dist -m -C",
-    "start": "tsx cli/cli.ts"
+    "start": "tsx cli/cli.ts",
+    "lint:prettier": "prettier '**/*.{js,ts}' --write"
+  },
+  "lint-staged": {
+    "*.ts": "prettier --write -u"
   },
   "files": [
     "dist",
@@ -47,6 +52,11 @@
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
   "devDependencies": {
-    "@vercel/ncc": "0.38.3"
+    "@commitlint/cli": "20.3.1",
+    "@commitlint/config-conventional": "20.2.0",
+    "@vercel/ncc": "0.38.3",
+    "husky": "9.1.7",
+    "lint-staged": "16.2.7",
+    "prettier": "3.8.0"
   }
 }
