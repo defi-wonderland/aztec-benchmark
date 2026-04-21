@@ -206,6 +206,7 @@ export class Profiler {
         gateCounts: profileResults.executionSteps.map(step => ({
           circuitName: step.functionName,
           gateCount: step.gateCount || 0,
+          witgenMs: step.timings?.witgen,
         })),
         gas,
         provingTime,
