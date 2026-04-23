@@ -12,6 +12,7 @@ import {
   type NamedBenchmarkedInteraction,
 } from './types.js';
 import { getSystemInfo } from './systemInfo.js';
+import { applyRegions, type TraceRegion } from './traceRegions.js';
 
 /**
  * Sums all numbers in an array.
@@ -35,6 +36,8 @@ interface ProfilerOptions {
   skipProving?: boolean;
   /** Fee payment method to use when sending transactions. */
   feePaymentMethod?: FeePaymentMethod;
+  /** Trace regions to extract per-region gate count breakdowns. */
+  regions?: TraceRegion[];
 }
 
 /**
@@ -43,11 +46,13 @@ interface ProfilerOptions {
 export class Profiler {
   #skipProving: boolean;
   #feePaymentMethod?: FeePaymentMethod;
+  #regions?: TraceRegion[];
 
   /** @param _wallet - Unused, kept for backward compatibility with existing callers. */
   constructor(_wallet?: EmbeddedWallet, options?: ProfilerOptions) {
     this.#skipProving = options?.skipProving ?? false;
     this.#feePaymentMethod = options?.feePaymentMethod;
+    this.#regions = options?.regions;
   }
 
   /**
@@ -114,11 +119,25 @@ export class Profiler {
       {} as Record<string, number>,
     );
 
+    // Apply trace region extraction if regions are configured
+    if (this.#regions?.length) {
+      for (const result of results) {
+        if (result.gateCounts.length) {
+          result.regions = applyRegions(result.gateCounts, this.#regions);
+        }
+      }
+    }
+
+    const regionSummaries = this.#regions?.length
+      ? this.#buildRegionSummaries(results)
+      : undefined;
+
     const report: ProfileReport = {
       summary,
       results: results,
       gasSummary,
       provingTimeSummary,
+      regionSummaries,
       systemInfo,
     };
 
@@ -129,6 +148,21 @@ export class Profiler {
       console.error(`Error writing results to ${filename}:`, error.message);
       throw error;
     }
+  }
+
+  /**
+   * Builds region summaries: for each region, a map of function name -> total gate count in that region.
+   */
+  #buildRegionSummaries(results: ProfileResult[]): Record<string, Record<string, number>> {
+    const summaries: Record<string, Record<string, number>> = {};
+    for (const result of results) {
+      if (!result.regions) continue;
+      for (const [regionName, regionResult] of Object.entries(result.regions)) {
+        if (!summaries[regionName]) summaries[regionName] = {};
+        summaries[regionName][result.name] = regionResult.totalGateCount;
+      }
+    }
+    return summaries;
   }
 
   /**

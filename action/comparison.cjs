@@ -189,6 +189,74 @@ function generateCircuitBreakdownSection(comparison, sortedNames, contractName) 
 }
 
 /**
+ * Generates a collapsible section showing per-region gate count comparisons.
+ * @param {object} comparison - The comparison object keyed by function name.
+ * @param {string[]} sortedNames - Sorted function names.
+ * @param {number} threshold - Regression threshold percentage.
+ * @param {string} contractName - The contract name for the section header.
+ * @returns {string} HTML string with collapsible region comparisons, or empty string if no region data.
+ */
+function generateRegionComparisonSection(comparison, sortedNames, threshold, contractName) {
+  const hasRegionData = sortedNames.some(name => {
+    const regions = comparison[name]?.regions;
+    return regions && (Object.keys(regions.pr).length > 0 || Object.keys(regions.main).length > 0);
+  });
+  if (!hasRegionData) return '';
+
+  const allRegionNames = new Set();
+  for (const funcName of sortedNames) {
+    const regions = comparison[funcName]?.regions;
+    if (regions) {
+      for (const name of Object.keys(regions.main)) allRegionNames.add(name);
+      for (const name of Object.keys(regions.pr)) allRegionNames.add(name);
+    }
+  }
+
+  if (allRegionNames.size === 0) return '';
+
+  const lines = [
+    '<details>',
+    `<summary>📊 ${contractName} region breakdown</summary>`,
+    '',
+  ];
+
+  for (const regionName of [...allRegionNames].sort()) {
+    lines.push(
+      `#### Region: \`${regionName}\``,
+      '',
+      '| 🚦 | Function | Base Gates | PR Gates | Diff |',
+      '|:---:|----------|----------:|--------:|------|',
+    );
+
+    for (const funcName of sortedNames) {
+      const regions = comparison[funcName]?.regions;
+      const mainRegion = regions?.main?.[regionName];
+      const prRegion = regions?.pr?.[regionName];
+
+      const mainGates = mainRegion?.totalGateCount ?? 0;
+      const prGates = prRegion?.totalGateCount ?? 0;
+
+      const regionMetrics = {
+        gates: { main: mainGates, pr: prGates },
+        daGas: { main: 0, pr: 0 },
+        l2Gas: { main: 0, pr: 0 },
+      };
+      const emoji = getStatusEmoji(regionMetrics, threshold);
+      const diff = formatDiff(mainGates, prGates);
+
+      lines.push(
+        `| ${emoji} | \`${funcName}\` | ${mainGates.toLocaleString()} | ${prGates.toLocaleString()} | ${diff} |`,
+      );
+    }
+
+    lines.push('');
+  }
+
+  lines.push('</details>');
+  return lines.join('\n');
+}
+
+/**
  * Generates an HTML table comparing benchmark results for a single contract.
  * Handles new contracts where baseJsonPath may be null (no base report exists).
  * @param {object} pair - An object containing contractName, baseJsonPath (or null), and prJsonPath.
@@ -252,6 +320,7 @@ function generateContractComparisonTable(pair, threshold, { circuitDetails = fal
       l2Gas: { main: getL2Gas(mainResult), pr: getL2Gas(prResult) },
       provingTime: { main: getProvingTime(mainResult), pr: getProvingTime(prResult) },
       gateCounts: { main: mainResult?.gateCounts ?? [], pr: prResult?.gateCounts ?? [] },
+      regions: { main: mainResult?.regions ?? {}, pr: prResult?.regions ?? {} },
     };
   }
 
@@ -333,6 +402,12 @@ function generateContractComparisonTable(pair, threshold, { circuitDetails = fal
     if (circuitSection) {
       output.push('', circuitSection);
     }
+  }
+
+  // Add per-region comparison sections if any results have region data
+  const regionSection = generateRegionComparisonSection(comparison, sortedNames, threshold, contractName);
+  if (regionSection) {
+    output.push('', regionSection);
   }
 
   return output.join('\n');
