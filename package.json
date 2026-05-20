@@ -9,7 +9,7 @@
     "aztec-benchmark": "bin/aztec-benchmark"
   },
   "scripts": {
-    "postinstall": "husky",
+    "prepare": "husky",
     "build": "tsc && ncc build action/index.cjs -o action/dist -m -C",
     "start": "tsx cli/cli.ts",
     "lint:prettier": "prettier '**/*.{js,ts}' --write"
