@@ -35,6 +35,8 @@ export interface GateCount {
   circuitName: string;
   /** The number of gates in the circuit. */
   gateCount: number;
+  /** Witness generation time in ms (hardware-dependent). */
+  witgenMs?: number;
 }
 
 /** Result of profiling a single function */
