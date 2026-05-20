@@ -82,7 +82,9 @@ export abstract class BenchmarkBase {
   /** Optional setup function run before benchmarks */
   abstract setup?(): Promise<BenchmarkContext>;
   /** Function returning the methods to benchmark. Can be a mix of plain interactions or named interactions. */
-  abstract getMethods(context: BenchmarkContext): Array<ContractFunctionInteractionCallIntent | NamedBenchmarkedInteraction>;
+  abstract getMethods(
+    context: BenchmarkContext,
+  ): Array<ContractFunctionInteractionCallIntent | NamedBenchmarkedInteraction>;
   /** Optional teardown function run after benchmarks (no longer abstract) */
   teardown?(context: BenchmarkContext): Promise<void>;
-} 
+}
