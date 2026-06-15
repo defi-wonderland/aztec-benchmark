@@ -27,17 +27,6 @@ export interface FeeOptions {
  * The profiler only supports a single global feePaymentMethod, but benchmarks
  * often require different methods per interaction. This class intercepts every
  * profiler call and injects the configured method and settings.
- *
- * The `simulate` override strips `estimateGas` from options and sets
- * `includeMetadata` instead. This prevents the wallet from inflating gas limits
- * to 2× block capacity during gas estimation, which would corrupt gate counts
- * and gas figures for any FPC contract that derives values from the gas settings.
- *
- * UPGRADE CHECK: on Aztec version bumps, verify that:
- *   1. `ContractFunctionInteraction.simulate()` still returns `estimatedGas`
- *      when `includeMetadata` is true (even without `estimateGas`)
- *   2. `BaseWallet.simulateTx()` still only inflates limits when
- *      `opts.fee.estimateGas` is truthy
  */
 export class FeeWrappedInteraction {
   constructor(
@@ -60,24 +49,7 @@ export class FeeWrappedInteraction {
   }
 
   async simulate(options?: SimulateInteractionOptions) {
-    // estimateGas stripping is only needed when a paymentMethod is configured:
-    // it prevents the wallet from inflating gas limits to 2× block capacity for
-    // FPC contracts that derive on-chain values from the gas settings passed in.
-    // Without a paymentMethod this class is a pass-through and must not alter
-    // gas estimation behaviour.
-    if (!this.paymentMethod && !options?.fee?.paymentMethod) {
-      return this.inner.simulate(options as unknown as SimulateInteractionOptions);
-    }
-    const { estimateGas, ...restFee } = options?.fee ?? {};
-    const adjusted = {
-      ...options,
-      includeMetadata: estimateGas || options?.includeMetadata,
-      fee: restFee,
-    } as SimulateInteractionOptions;
-    // Double cast needed: ContractFunctionInteraction.simulate has two overloads
-    // with a generic T extends SimulateInteractionOptions, and TypeScript cannot
-    // resolve which overload to apply when the argument is the base type.
-    return this.inner.simulate(this.withFee(adjusted) as unknown as SimulateInteractionOptions);
+    return this.inner.simulate(this.withFee(options));
   }
 
   async profile(options?: ProfileInteractionOptions) {
