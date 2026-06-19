@@ -185,14 +185,19 @@ export class Profiler {
 
       const feeOpts = this.#feePaymentMethod ? { paymentMethod: this.#feePaymentMethod } : undefined;
 
-      // Gas simulated is 10% higher by default, we set the padding to 0 to get a better estimate.
+      // `includeMetadata` returns `gasUsed`: the raw gas the simulation consumed, with no padding.
       const simResult = await f.action.simulate({
         from: origin,
         additionalScopes,
         includeMetadata: true,
-        fee: { estimateGas: true, estimatedGasPadding: 0, ...feeOpts },
+        fee: feeOpts,
       });
-      const gas: GasLimits | undefined = simResult.estimatedGas;
+      const gas: GasLimits | undefined = simResult.gasUsed
+        ? {
+            gasLimits: simResult.gasUsed.totalGas,
+            teardownGasLimits: simResult.gasUsed.teardownGas,
+          }
+        : undefined;
       // Profile the tx to get gate counts and optionally proving time.
       const profileResults = await f.action.profile({
         profileMode: 'full',

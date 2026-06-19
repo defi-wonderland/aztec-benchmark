@@ -108,13 +108,14 @@ import type { FeePaymentMethod } from '@aztec/aztec.js/fee';
 import { createStore } from '@aztec/kv-store/lmdb-v2';
 import { createPXE, getPXEConfig } from '@aztec/pxe/server';
 import { createAztecNodeClient, waitForNode } from '@aztec/aztec.js/node';
-import { registerInitialSandboxAccountsInWallet, type TestWallet } from '@aztec/test-wallet/server';
+import { EmbeddedWallet } from '@aztec/wallets/embedded';
+import { registerInitialLocalNetworkAccountsInWallet } from '@aztec/wallets/testing';
 // import { YourSpecificContract } from '../artifacts/YourSpecificContract.js'; // Replace with your actual contract artifact
 
 // 1. Define a specific context for your benchmark (optional but good practice)
 interface MyBenchmarkContext extends BenchmarkContext {
   pxe: PXE;
-  wallet: TestWallet;
+  wallet: EmbeddedWallet;
   deployer: AztecAddress;
   contract: Contract; // Use the generic Contract type or your specific contract type
   feePaymentMethod?: FeePaymentMethod;
@@ -140,16 +141,16 @@ export default class MyContractBenchmark extends Benchmark {
     });
 
     const pxe: PXE = await createPXE(node, fullConfig, { store });
-    const wallet: TestWallet = await TestWallet.create(node, { ...fullConfig, proverEnabled });
-    const accounts: AztecAddress[] = await registerInitialSandboxAccountsInWallet(wallet);
+    // `EmbeddedWalletOptions` uses a unified `pxe` field for PXE config and dependency overrides.
+    const wallet: EmbeddedWallet = await EmbeddedWallet.create(node, { pxe: fullConfig });
+    const accounts: AztecAddress[] = await registerInitialLocalNetworkAccountsInWallet(wallet);
     const [deployer] = accounts;
     
-    //  Deploy your contract (replace YourSpecificContract with your actual contract class)
-    const deployedContract = await YourSpecificContract
+    //  Deploy your contract (replace YourSpecificContract with your actual contract class).
+    //  `DeployMethod.send()` now always returns `{ contract, receipt, instance }`.
+    const { contract } = await YourSpecificContract
       .deploy(wallet, /* constructor args */)
-      .send({ from: deployer })
-      .deployed();
-    const contract = await YourSpecificContract.at(deployedContract.address, wallet);
+      .send({ from: deployer });
     console.log('Contract deployed at:', contract.address.toString());
 
     // Optional: use SponsoredFPC so accounts don't need pre-existing Fee Juice.
